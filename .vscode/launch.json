@@ -1,0 +1,156 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug executable 'cut_creator'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--bin=cut_creator",
+                    "--package=cut_creator"
+                ],
+                "filter": {
+                    "name": "cut_creator",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in executable 'cut_creator'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--bin=cut_creator",
+                    "--package=cut_creator"
+                ],
+                "filter": {
+                    "name": "cut_creator",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug example 'save_plot'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--example=save_plot",
+                    "--package=cut_creator"
+                ],
+                "filter": {
+                    "name": "save_plot",
+                    "kind": "example"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in example 'save_plot'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--example=save_plot",
+                    "--package=cut_creator"
+                ],
+                "filter": {
+                    "name": "save_plot",
+                    "kind": "example"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug example 'wav_plot'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--example=wav_plot",
+                    "--package=cut_creator"
+                ],
+                "filter": {
+                    "name": "wav_plot",
+                    "kind": "example"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in example 'wav_plot'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--example=wav_plot",
+                    "--package=cut_creator"
+                ],
+                "filter": {
+                    "name": "wav_plot",
+                    "kind": "example"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug example 'hello_world'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--example=hello_world",
+                    "--package=cut_creator"
+                ],
+                "filter": {
+                    "name": "hello_world",
+                    "kind": "example"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in example 'hello_world'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--example=hello_world",
+                    "--package=cut_creator"
+                ],
+                "filter": {
+                    "name": "hello_world",
+                    "kind": "example"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        }
+    ]
+}
