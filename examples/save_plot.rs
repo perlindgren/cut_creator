@@ -1,7 +1,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
 
 use eframe::{egui, egui::ColorImage};
-use egui::plot::{Legend, Line, Plot, PlotPoints};
+use egui_plot::{Legend, Line, Plot, PlotPoints};
 
 fn main() -> Result<(), eframe::Error> {
     env_logger::init(); // Log to stderr (if you run with `RUST_LOG=debug`).
@@ -68,6 +68,7 @@ impl eframe::App for MyApp {
         });
 
         if let (Some(screenshot), Some(plot_location)) = (self.screenshot.take(), plot_rect) {
+            println!("--");
             if let Some(mut path) = rfd::FileDialog::new().save_file() {
                 path.set_extension("png");
 
