@@ -14,15 +14,23 @@ fn main() -> Result<(), eframe::Error> {
     eframe::run_native("Wav Plot", options, Box::new(|_cc| Box::<MyApp>::default()))
 }
 
+use splines::{Interpolation, Key, Spline};
+
 struct MyApp {
     knots: Vec<[f64; 2]>,
+    splines: Spline<f64, f64>,
 }
 
 impl Default for MyApp {
     fn default() -> Self {
-        Self {
-            knots: vec![[0.0, 1.0], [2.0, 3.0], [3.0, 2.0], [2.5, 5.0]],
-        }
+        let knots = vec![[0.0, 1.0], [2.0, 3.0], [3.0, 2.0], [4.0, 1.0], [5.0, 0.0]];
+        let splines = Spline::from_iter(
+            knots
+                .iter()
+                .map(|p| Key::new(p[0], p[1], Interpolation::CatmullRom)),
+        );
+
+        Self { knots, splines }
     }
 }
 
@@ -53,12 +61,22 @@ impl eframe::App for MyApp {
                         }
                     }
                     plot_ui.line(Line::new(PlotPoints::from(self.knots.clone())));
+
                     fn f(x: f64) -> f64 {
                         (x).sin()
                     };
-                    let plot_point = PlotPoints::from_explicit_callback(f, (0.0..2.0 * PI), 10);
+                    let plot_points = PlotPoints::from_explicit_callback(f, (0.0..2.0 * PI), 10);
+                    plot_ui.line(Line::new(plot_points));
 
-                    plot_ui.line(Line::new(plot_point));
+                    let splines = self.splines.clone();
+
+                    let sample = move |t| {
+                        println!("t {}, sample {:?}", t, splines.sample(t));
+                        splines.sample(t).unwrap()
+                    };
+
+                    let plot_points = PlotPoints::from_explicit_callback(sample, (2.0..3.0), 10);
+                    plot_ui.line(Line::new(plot_points));
                 });
             });
         });
