@@ -94,6 +94,7 @@ impl Splines {
                 cp.filter(|(_, selected)| !*selected).unzip();
         }
 
+        let cp = self.control_points.clone();
         let control_point_shapes: Vec<Shape> = self
             .control_points
             .iter_mut()
@@ -111,10 +112,18 @@ impl Splines {
                     clicked = false;
                 }
 
+                let min_x = if i > 0 { cp.get(i - 1).unwrap().x } else { 0.0 };
+                let max_x = cp.get(i + 1).unwrap_or(&response.rect.max).x;
+
                 let point_response = ui.interact(point_rect, point_id, Sense::drag());
 
-                *point += point_response.drag_delta();
-                *point = to_screen.from().clamp(*point);
+                let delta = point_response.drag_delta();
+
+                if delta != Vec2::ZERO {
+                    *point += point_response.drag_delta();
+                    *point = to_screen.from().clamp(*point);
+                    point.x = point.x.min(max_x).max(min_x);
+                }
 
                 let point_in_screen = to_screen.transform_pos(*point);
 
