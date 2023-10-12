@@ -140,14 +140,10 @@ impl Splines {
             .collect();
 
         if clicked {
+            // screen position
             let pos = response.interact_pointer_pos().unwrap();
-            println!(
-                "clicked outside {:?}, {:?}, {:?}",
-                pos,
-                to_screen.inverse().transform_pos(pos),
-                to_screen.inverse().transform_pos_clamped(pos)
-            );
 
+            // data point
             let pos = to_screen.inverse().transform_pos_clamped(pos);
 
             // insert
