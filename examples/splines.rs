@@ -196,12 +196,11 @@ impl Splines {
         }
 
         if self.knots.len() > 3 {
-            let start = self.knots[1].x + 0.00001; // to ensure we have two knots on either side
-            let end = self.knots[self.knots.len() - 2][0] - 0.000001;
-            // let plot_points = PlotPoints::from_explicit_callback(sample, start..end, 100);
+            let start = self.knots[1].x; // to ensure we have two knots on either side
+            let end = self.knots[self.knots.len() - 2][0];
 
             let interval = end - start;
-            let points: u32 = 100;
+            let points: u32 = 1000;
             let step = interval / (points as f32);
 
             let mut v = vec![];
