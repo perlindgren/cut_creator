@@ -1,9 +1,11 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
 
 use eframe::egui;
+use egui::Stroke;
 use egui_plot::{Legend, Line, Plot, PlotPoints};
 use std::f64::consts::PI;
 
+use egui::*;
 fn main() -> Result<(), eframe::Error> {
     env_logger::init(); // Log to stderr (if you run with `RUST_LOG=debug`).
 
@@ -72,7 +74,48 @@ impl eframe::App for MyApp {
                             )
                         }
                     }
+
                     plot_ui.line(Line::new(PlotPoints::from(self.knots.clone())));
+
+                    let control_point_radius = 8.0;
+
+                    // let (response, painter) =
+                    //     ui.allocate_painter(Vec2::new(ui.available_width(), 300.0), Sense::hover());
+                    let response = plot_ui.response();
+
+                    let to_screen = emath::RectTransform::from_to(
+                        Rect::from_min_size(Pos2::ZERO, response.rect.size()),
+                        response.rect,
+                    );
+
+                    let control_point_shapes: Vec<Shape> = self
+                        .knots
+                        .iter_mut()
+                        .enumerate()
+                        .map(|(i, point)| {
+                            let size = Vec2::splat(2.0 * control_point_radius);
+
+                            let point_in_screen = to_screen.transform_pos(Pos2 {
+                                x: point[0] as f32,
+                                y: point[1] as f32,
+                            });
+                            let point_rect = Rect::from_center_size(point_in_screen, size);
+                            let point_id = response.id.with(i);
+                            // let point_response = ui.interact(point_rect, point_id, Sense::drag());
+
+                            //         // *point += point_response.drag_delta();
+                            //         // *point = to_screen.from().clamp(*point);
+
+                            //         // let point_in_screen = to_screen.transform_pos(*point);
+                            // let stroke = ui.style().interact(&point_response).fg_stroke;
+                            //let stroke = ui.style().interact(response).fg_stroke;
+                            let stroke = Stroke::NONE;
+
+                            Shape::circle_stroke(point_in_screen, control_point_radius, stroke)
+                        })
+                        .collect();
+
+                    // painter.extend(control_point_shapes);
 
                     // fn f(x: f64) -> f64 {
                     //     (x).sin()
