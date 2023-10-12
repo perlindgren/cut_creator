@@ -30,13 +30,14 @@ impl eframe::App for MyApp {
 
 use egui::epaint::PathShape;
 use egui::*;
+use splines::{Interpolation, Key, Spline};
 
 pub struct Splines {
-    /// The control points. The [`Self::degree`] first of them are used.
-    control_points: Vec<Pos2>,
+    /// The control points.
+    knots: Vec<Pos2>,
 
     /// Selected
-    control_selected: Vec<bool>,
+    knots_selected: Vec<bool>,
 
     /// Stroke selected.
     stroke_default: Stroke,
@@ -46,22 +47,47 @@ pub struct Splines {
 
     /// Stroke for auxiliary lines.
     line_stroke: Stroke,
+
+    /// Stroke for splines.
+    spline_stroke: Stroke,
+
+    /// Spline
+    spline: Spline<f32, f32>,
+}
+
+impl Splines {
+    // call to update spline when knots are changed
+    fn update(&mut self) {
+        self.spline = Spline::from_iter(
+            self.knots
+                .iter()
+                .map(|p| Key::new(p[0], p[1], Interpolation::CatmullRom)),
+        );
+    }
 }
 
 impl Default for Splines {
     fn default() -> Self {
-        Self {
-            control_points: vec![
-                pos2(0.0, 0.0),
-                pos2(60.0, 250.0),
-                pos2(200.0, 200.0),
-                pos2(250.0, 50.0),
-            ],
-            control_selected: vec![false; 4],
-            stroke_default: Stroke::new(1.0, Color32::WHITE.linear_multiply(0.5)),
-            stroke_selected: Stroke::new(1.0, Color32::WHITE),
+        let knots = vec![
+            pos2(0.0, 0.0),
+            pos2(60.0, 250.0),
+            pos2(200.0, 200.0),
+            pos2(250.0, 50.0),
+        ];
+        let spline = Spline::from_iter(
+            knots
+                .iter()
+                .map(|p| Key::new(p[0], p[1], Interpolation::CatmullRom)),
+        );
 
+        Self {
+            knots,
+            knots_selected: vec![false; 4],
+            stroke_default: Stroke::new(1.0, Color32::WHITE.linear_multiply(0.25)),
+            stroke_selected: Stroke::new(1.0, Color32::WHITE),
             line_stroke: Stroke::new(1.0, Color32::RED.linear_multiply(0.25)),
+            spline_stroke: Stroke::new(1.0, Color32::BLUE.linear_multiply(1.0)),
+            spline,
         }
     }
 }
@@ -79,24 +105,26 @@ impl Splines {
         );
 
         let mut clicked = response.clicked();
+        let mut update = false;
 
         let control_point_radius = 8.0;
 
         if ui.input(|i| i.key_pressed(egui::Key::Delete)) {
             println!("delete");
             let cp = self
-                .control_points
+                .knots
                 .clone()
                 .into_iter()
-                .zip(self.control_selected.clone().into_iter());
+                .zip(self.knots_selected.clone().into_iter());
 
-            (self.control_points, self.control_selected) =
-                cp.filter(|(_, selected)| !*selected).unzip();
+            (self.knots, self.knots_selected) = cp.filter(|(_, selected)| !*selected).unzip();
+
+            update = true;
         }
 
-        let cp = self.control_points.clone();
+        let cp = self.knots.clone();
         let control_point_shapes: Vec<Shape> = self
-            .control_points
+            .knots
             .iter_mut()
             .enumerate()
             .map(|(i, point)| {
@@ -108,7 +136,7 @@ impl Splines {
                 let point_id = response.id.with(i);
                 let point_click = ui.interact(point_rect, point_id, Sense::click());
                 if point_click.clicked() {
-                    self.control_selected[i] = !self.control_selected[i];
+                    self.knots_selected[i] = !self.knots_selected[i];
                     clicked = false;
                 }
 
@@ -120,6 +148,7 @@ impl Splines {
                 let delta = point_response.drag_delta();
 
                 if delta != Vec2::ZERO {
+                    update = true;
                     *point += point_response.drag_delta();
                     *point = to_screen.from().clamp(*point);
                     point.x = point.x.min(max_x).max(min_x);
@@ -130,7 +159,7 @@ impl Splines {
                 Shape::circle_stroke(
                     point_in_screen,
                     control_point_radius,
-                    if self.control_selected[i] {
+                    if self.knots_selected[i] {
                         self.stroke_selected
                     } else {
                         self.stroke_default
@@ -148,22 +177,50 @@ impl Splines {
 
             // insert
             let cp = self
-                .control_points
+                .knots
                 .clone()
                 .into_iter()
-                .zip(self.control_selected.clone().into_iter());
+                .zip(self.knots_selected.clone().into_iter());
 
             let (head, mut tail): (Vec<_>, Vec<_>) = cp.partition(|(p2, _)| pos.x < p2.x);
 
             tail.push((pos, false));
             tail.extend(head);
 
-            (self.control_points, self.control_selected) = tail.into_iter().unzip();
+            (self.knots, self.knots_selected) = tail.into_iter().unzip();
+            update = true;
         }
 
-        let points_in_screen: Vec<Pos2> =
-            self.control_points.iter().map(|p| to_screen * *p).collect();
+        if update {
+            self.update();
+        }
 
+        if self.knots.len() > 3 {
+            let start = self.knots[1].x + 0.00001; // to ensure we have two knots on either side
+            let end = self.knots[self.knots.len() - 2][0] - 0.000001;
+            // let plot_points = PlotPoints::from_explicit_callback(sample, start..end, 100);
+
+            let interval = end - start;
+            let points: u32 = 100;
+            let step = interval / (points as f32);
+
+            let mut v = vec![];
+
+            for i in 0..points {
+                let t = i as f32 * step + start;
+                v.push(
+                    to_screen
+                        * Pos2 {
+                            x: t,
+                            y: self.spline.sample(t).unwrap(),
+                        },
+                )
+            }
+
+            painter.add(PathShape::line(v, self.spline_stroke));
+        }
+
+        let points_in_screen: Vec<Pos2> = self.knots.iter().map(|p| to_screen * *p).collect();
         painter.add(PathShape::line(points_in_screen, self.line_stroke));
         painter.extend(control_point_shapes);
 
