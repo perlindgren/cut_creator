@@ -1,8 +1,5 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
 
-use eframe::egui;
-use egui_plot::{Legend, Line, Plot, PlotPoints};
-
 fn main() -> Result<(), eframe::Error> {
     env_logger::init(); // Log to stderr (if you run with `RUST_LOG=debug`).
 
@@ -31,7 +28,7 @@ impl eframe::App for MyApp {
     }
 }
 
-use egui::epaint::{PathShape, QuadraticBezierShape};
+use egui::epaint::PathShape;
 use egui::*;
 
 pub struct Splines {
@@ -55,7 +52,7 @@ impl Default for Splines {
     fn default() -> Self {
         Self {
             control_points: vec![
-                pos2(50.0, 50.0),
+                pos2(0.0, 0.0),
                 pos2(60.0, 250.0),
                 pos2(200.0, 200.0),
                 pos2(250.0, 50.0),
@@ -71,18 +68,30 @@ impl Default for Splines {
 
 impl Splines {
     pub fn ui_content(&mut self, ui: &mut Ui) -> egui::Response {
-        let (response, painter) =
-            ui.allocate_painter(Vec2::new(ui.available_width(), 500.0), Sense::hover());
+        let (response, painter) = ui.allocate_painter(
+            Vec2::new(ui.available_width(), ui.available_height()),
+            Sense::click_and_drag(),
+        );
 
         let to_screen = emath::RectTransform::from_to(
             Rect::from_min_size(Pos2::ZERO, response.rect.size()),
             response.rect,
         );
 
+        let mut clicked = response.clicked();
+
         let control_point_radius = 8.0;
 
         if ui.input(|i| i.key_pressed(egui::Key::Delete)) {
             println!("delete");
+            let cp = self
+                .control_points
+                .clone()
+                .into_iter()
+                .zip(self.control_selected.clone().into_iter());
+
+            (self.control_points, self.control_selected) =
+                cp.filter(|(_, selected)| !*selected).unzip();
         }
 
         let control_point_shapes: Vec<Shape> = self
@@ -94,16 +103,12 @@ impl Splines {
 
                 let point_in_screen = to_screen.transform_pos(*point);
                 let point_rect = Rect::from_center_size(point_in_screen, size);
+
                 let point_id = response.id.with(i);
                 let point_click = ui.interact(point_rect, point_id, Sense::click());
                 if point_click.clicked() {
-                    println!(
-                        "clicked i {}, {:?} {}",
-                        i,
-                        point_click.interact_pointer_pos(),
-                        self.control_selected[i]
-                    );
                     self.control_selected[i] = !self.control_selected[i];
+                    clicked = false;
                 }
 
                 let point_response = ui.interact(point_rect, point_id, Sense::drag());
@@ -124,6 +129,32 @@ impl Splines {
                 )
             })
             .collect();
+
+        if clicked {
+            let pos = response.interact_pointer_pos().unwrap();
+            println!(
+                "clicked outside {:?}, {:?}, {:?}",
+                pos,
+                to_screen.inverse().transform_pos(pos),
+                to_screen.inverse().transform_pos_clamped(pos)
+            );
+
+            let pos = to_screen.inverse().transform_pos_clamped(pos);
+
+            // insert
+            let cp = self
+                .control_points
+                .clone()
+                .into_iter()
+                .zip(self.control_selected.clone().into_iter());
+
+            let (head, mut tail): (Vec<_>, Vec<_>) = cp.partition(|(p2, _)| pos.x < p2.x);
+
+            tail.push((pos, false));
+            tail.extend(head);
+
+            (self.control_points, self.control_selected) = tail.into_iter().unzip();
+        }
 
         let points_in_screen: Vec<Pos2> =
             self.control_points.iter().map(|p| to_screen * *p).collect();
