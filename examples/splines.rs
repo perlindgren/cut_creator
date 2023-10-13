@@ -222,7 +222,10 @@ impl Splines {
         let points_in_screen: Vec<Pos2> = self.knots.iter().map(|p| to_screen * *p).collect();
         painter.add(PathShape::line(points_in_screen, self.line_stroke));
         painter.extend(control_point_shapes);
-        if let Some(pos) = response.hover_pos() {
+        if let Some(pos) = ui
+            .interact(response.rect, ui.id(), Sense::click_and_drag())
+            .hover_pos()
+        {
             painter.add(PathShape::line(
                 vec![
                     Pos2 {
