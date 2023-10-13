@@ -12,7 +12,7 @@ fn main() -> Result<(), eframe::Error> {
 
 #[derive(Default)]
 struct MyApp {
-    bezier: Splines,
+    splines: Splines,
 }
 
 impl eframe::App for MyApp {
@@ -22,7 +22,7 @@ impl eframe::App for MyApp {
 
             //
             Frame::canvas(ui.style()).show(ui, |ui| {
-                self.bezier.ui_content(ui);
+                self.splines.ui_content(ui);
             });
         });
     }
@@ -222,6 +222,21 @@ impl Splines {
         let points_in_screen: Vec<Pos2> = self.knots.iter().map(|p| to_screen * *p).collect();
         painter.add(PathShape::line(points_in_screen, self.line_stroke));
         painter.extend(control_point_shapes);
+        if let Some(pos) = response.hover_pos() {
+            painter.add(PathShape::line(
+                vec![
+                    Pos2 {
+                        x: pos.x,
+                        y: response.rect.top(),
+                    },
+                    Pos2 {
+                        x: pos.x,
+                        y: response.rect.bottom(),
+                    },
+                ],
+                self.stroke_default,
+            ));
+        }
 
         response
     }
