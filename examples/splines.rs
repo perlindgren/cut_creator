@@ -123,6 +123,24 @@ impl Splines {
         }
 
         let cp = self.knots.clone();
+        // drag all points
+        if response.dragged() {
+            let delta = response.drag_delta();
+            println!("dragged {:?}", response.drag_delta());
+            update = true;
+
+            self.knots.iter_mut().enumerate().for_each(|(i, point)| {
+                let min_x = if i > 0 { cp.get(i - 1).unwrap().x } else { 0.0 };
+                let max_x = cp.get(i + 1).unwrap_or(&response.rect.max).x;
+
+                if self.knots_selected[i] {
+                    *point += delta;
+                    *point = to_screen.from().clamp(*point);
+                    point.x = point.x.min(max_x).max(min_x);
+                }
+            });
+        }
+
         let control_point_shapes: Vec<Shape> = self
             .knots
             .iter_mut()
@@ -149,7 +167,7 @@ impl Splines {
 
                 if delta != Vec2::ZERO {
                     update = true;
-                    *point += point_response.drag_delta();
+                    *point += delta;
                     *point = to_screen.from().clamp(*point);
                     point.x = point.x.min(max_x).max(min_x);
                 }
@@ -168,6 +186,7 @@ impl Splines {
             })
             .collect();
 
+        // add new point
         if clicked {
             // screen position
             let pos = response.interact_pointer_pos().unwrap();
@@ -222,8 +241,9 @@ impl Splines {
         let points_in_screen: Vec<Pos2> = self.knots.iter().map(|p| to_screen * *p).collect();
         painter.add(PathShape::line(points_in_screen, self.line_stroke));
         painter.extend(control_point_shapes);
+
         if let Some(pos) = ui
-            .interact(response.rect, ui.id(), Sense::click_and_drag())
+            .interact(response.rect, ui.id(), Sense::hover())
             .hover_pos()
         {
             painter.add(PathShape::line(
