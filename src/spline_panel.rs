@@ -1,5 +1,6 @@
 use egui::epaint::PathShape;
 use egui::*;
+use epaint::RectShape;
 use splines::{Interpolation, Key, Spline};
 
 pub struct Splines {
@@ -14,6 +15,15 @@ pub struct Splines {
 
     /// Stroke selected.
     stroke_selected: Stroke,
+
+    /// Select rect
+    select_start: Pos2,
+
+    /// Select end
+    select_end: Pos2,
+
+    /// Select drag
+    select_drag: bool,
 
     /// Stroke for auxiliary lines.
     line_stroke: Stroke,
@@ -63,6 +73,9 @@ impl Default for Splines {
             knots_selected: vec![false; 4],
             stroke_default: Stroke::new(1.0, Color32::WHITE.linear_multiply(0.25)),
             stroke_selected: Stroke::new(1.0, Color32::WHITE),
+            select_start: Pos2::ZERO,
+            select_end: Pos2::ZERO,
+            select_drag: false,
             line_stroke: Stroke::new(1.0, Color32::RED.linear_multiply(0.25)),
             spline_stroke: Stroke::new(1.0, Color32::BLUE.linear_multiply(1.0)),
             spline,
@@ -86,6 +99,10 @@ impl Splines {
         let mut clicked = response.clicked();
         let mut update = false;
 
+        if ui.input(|i| i.key_pressed(egui::Key::Z) && i.modifiers.ctrl) {
+            println!("undo");
+        }
+
         // delete knot
         if ui.input(|i| i.key_pressed(egui::Key::Delete)) {
             println!("delete");
@@ -100,9 +117,58 @@ impl Splines {
             update = true;
         }
 
+        // selection
+        // unselect all by ESCAPE or double right click
+        if ui.input(|i| i.key_pressed(egui::Key::Escape))
+            || response.double_clicked_by(PointerButton::Secondary)
+        {
+            println!("escape");
+            for s in self.knots_selected.iter_mut() {
+                *s = false;
+            }
+        }
+
+        if response.drag_started_by(PointerButton::Secondary) {
+            let pos = response.interact_pointer_pos().unwrap();
+            println!("dragged_start {:?} ", pos);
+            self.select_start = pos;
+            self.select_end = pos;
+            self.select_drag = true;
+        }
+
+        if response.drag_released_by(PointerButton::Secondary) {
+            let pos = response.interact_pointer_pos().unwrap();
+            println!("dragged_release {:?} ", pos);
+            let rect = Rect::from_two_pos(self.select_start, self.select_end);
+
+            self.knots.iter().enumerate().for_each(|(i, point)| {
+                if rect.contains(to_screen * *point) {
+                    self.knots_selected[i] = !self.knots_selected[i];
+                }
+            });
+
+            self.select_drag = false;
+        }
+
+        if response.dragged_by(PointerButton::Secondary) {
+            let pos = response.interact_pointer_pos().unwrap();
+            println!("dragged_by {:?}", pos);
+
+            self.select_end = pos;
+        }
+
+        // paint selection
+        if self.select_drag {
+            painter.add(Shape::Rect(RectShape::stroke(
+                Rect::from_two_pos(self.select_start, self.select_end),
+                Rounding::default(),
+                self.stroke_default,
+            )));
+        }
+
         let cp = self.knots.clone();
         // drag all knots
-        if response.dragged() {
+        if response.dragged_by(PointerButton::Primary) {
             let delta = response.drag_delta();
             println!("dragged {:?}", response.drag_delta());
             update = true;
@@ -120,7 +186,7 @@ impl Splines {
         }
 
         let control_point_radius = 8.0;
-        // move single point
+        // knots
         let control_point_shapes: Vec<Shape> = self
             .knots
             .iter_mut()
