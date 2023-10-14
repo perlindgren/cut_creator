@@ -3,12 +3,15 @@ use egui::*;
 use epaint::RectShape;
 use splines::{Interpolation, Key, Spline};
 
+#[derive(Copy, Clone)]
+pub struct Knot {
+    pos: Pos2,
+    selected: bool,
+}
+
 pub struct Splines {
     /// The control points.
-    knots: Vec<Pos2>,
-
-    /// Selected
-    knots_selected: Vec<bool>,
+    knots: Vec<Knot>,
 
     /// Stroke selected.
     stroke_default: Stroke,
@@ -44,7 +47,7 @@ impl Splines {
         self.spline = Spline::from_iter(
             self.knots
                 .iter()
-                .map(|p| Key::new(p[0], p[1], Interpolation::CatmullRom)),
+                .map(|p| Key::new(p.pos.x, p.pos.y, Interpolation::CatmullRom)),
         );
     }
 
@@ -57,20 +60,23 @@ impl Splines {
 impl Default for Splines {
     fn default() -> Self {
         let knots = vec![
-            pos2(0.0, 0.0),
-            pos2(60.0, 250.0),
-            pos2(200.0, 200.0),
-            pos2(250.0, 50.0),
+            Knot {
+                pos: pos2(0.0, 0.0),
+                selected: false,
+            },
+            Knot {
+                pos: pos2(400.0, 0.0),
+                selected: false,
+            },
         ];
         let spline = Spline::from_iter(
             knots
                 .iter()
-                .map(|p| Key::new(p[0], p[1], Interpolation::CatmullRom)),
+                .map(|k| Key::new(k.pos.x, k.pos.y, Interpolation::CatmullRom)),
         );
 
         Self {
             knots,
-            knots_selected: vec![false; 4],
             stroke_default: Stroke::new(1.0, Color32::WHITE.linear_multiply(0.25)),
             stroke_selected: Stroke::new(1.0, Color32::WHITE),
             select_start: Pos2::ZERO,
@@ -106,13 +112,8 @@ impl Splines {
         // delete knot
         if ui.input(|i| i.key_pressed(egui::Key::Delete)) {
             println!("delete");
-            let cp = self
-                .knots
-                .clone()
-                .into_iter()
-                .zip(self.knots_selected.clone().into_iter());
 
-            (self.knots, self.knots_selected) = cp.filter(|(_, selected)| !*selected).unzip();
+            self.knots.retain(|k| !k.selected);
 
             update = true;
         }
@@ -123,8 +124,8 @@ impl Splines {
             || response.double_clicked_by(PointerButton::Secondary)
         {
             println!("escape");
-            for s in self.knots_selected.iter_mut() {
-                *s = false;
+            for k in self.knots.iter_mut() {
+                k.selected = false;
             }
         }
 
@@ -141,12 +142,13 @@ impl Splines {
             println!("dragged_release {:?} ", pos);
             let rect = Rect::from_two_pos(self.select_start, self.select_end);
 
-            self.knots.iter().enumerate().for_each(|(i, point)| {
-                if rect.contains(to_screen * *point) {
-                    self.knots_selected[i] = !self.knots_selected[i];
+            self.knots.iter_mut().enumerate().for_each(|(i, k)| {
+                if rect.contains(to_screen * k.pos) {
+                    k.selected ^= true;
                 }
             });
 
+            update = true;
             self.select_drag = false;
         }
 
@@ -157,7 +159,7 @@ impl Splines {
             self.select_end = pos;
         }
 
-        // paint selection
+        // paint selection rectangle
         if self.select_drag {
             painter.add(Shape::Rect(RectShape::stroke(
                 Rect::from_two_pos(self.select_start, self.select_end),
@@ -171,18 +173,36 @@ impl Splines {
         if response.dragged_by(PointerButton::Primary) {
             let delta = response.drag_delta();
             println!("dragged {:?}", response.drag_delta());
+
             update = true;
 
-            self.knots.iter_mut().enumerate().for_each(|(i, point)| {
-                let min_x = if i > 0 { cp.get(i - 1).unwrap().x } else { 0.0 };
-                let max_x = cp.get(i + 1).unwrap_or(&response.rect.max).x;
-
-                if self.knots_selected[i] {
-                    *point += delta;
-                    *point = to_screen.from().clamp(*point);
-                    point.x = point.x.min(max_x).max(min_x);
+            if delta.x > 0.0 {
+                // right
+                for i in (0..cp.len()).rev() {
+                    if self.knots[i].selected {
+                        self.knots[i].pos += delta;
+                        if i < cp.len() - 1 {
+                            println!("clamp right i {}", i);
+                            self.knots[i].pos.x =
+                                self.knots[i].pos.x.min(self.knots[i + 1].pos.x - 1.0);
+                        }
+                        self.knots[i].pos = to_screen.from().clamp(self.knots[i].pos);
+                    }
                 }
-            });
+            } else {
+                // left
+                for i in 0..cp.len() {
+                    if self.knots[i].selected {
+                        self.knots[i].pos += delta;
+                        if i > 0 {
+                            println!("clamp left i {}", i);
+                            self.knots[i].pos.x =
+                                self.knots[i].pos.x.max(self.knots[i - 1].pos.x + 1.0);
+                        }
+                        self.knots[i].pos = to_screen.from().clamp(self.knots[i].pos);
+                    }
+                }
+            }
         }
 
         let control_point_radius = 8.0;
@@ -191,39 +211,50 @@ impl Splines {
             .knots
             .iter_mut()
             .enumerate()
-            .map(|(i, point)| {
+            .map(|(i, k)| {
                 let size = Vec2::splat(2.0 * control_point_radius);
 
-                let point_in_screen = to_screen.transform_pos(*point);
+                let point_in_screen = to_screen.transform_pos(k.pos);
                 let point_rect = Rect::from_center_size(point_in_screen, size);
 
                 let point_id = response.id.with(i);
                 let point_click = ui.interact(point_rect, point_id, Sense::click());
+
+                // toggle select on click
                 if point_click.clicked() {
-                    self.knots_selected[i] = !self.knots_selected[i];
+                    k.selected ^= true;
                     clicked = false;
                 }
 
-                let min_x = if i > 0 { cp.get(i - 1).unwrap().x } else { 0.0 };
-                let max_x = cp.get(i + 1).unwrap_or(&response.rect.max).x;
-
                 let point_response = ui.interact(point_rect, point_id, Sense::drag());
-
                 let delta = point_response.drag_delta();
 
                 if delta != Vec2::ZERO {
-                    update = true;
-                    *point += delta;
-                    *point = to_screen.from().clamp(*point);
-                    point.x = point.x.min(max_x).max(min_x);
+                    println!("----";)
                 }
 
-                let point_in_screen = to_screen.transform_pos(*point);
+                // k.pos += delta;
+                // if delta.x > 0.0 {
+                //     // right
+                //     if i < cp.len() - 1 {
+                //         println!("- clamp right i {}", i);
+                //         k.pos.x = k.pos.x.min(cp[i + 1].pos.x - 1.0);
+                //     }
+                // } else if delta.x < 0.0 {
+                //     // left
+                //     if i > 0 {
+                //         println!("- clamp left i {}", i);
+                //         k.pos.x = k.pos.x.max(cp[i - 1].pos.x + 1.0);
+                //     }
+                // }
+                // k.pos = to_screen.from().clamp(k.pos);
+
+                let point_in_screen = to_screen.transform_pos(k.pos);
 
                 Shape::circle_stroke(
                     point_in_screen,
                     control_point_radius,
-                    if self.knots_selected[i] {
+                    if k.selected {
                         self.stroke_selected
                     } else {
                         self.stroke_default
@@ -241,18 +272,17 @@ impl Splines {
             let pos = to_screen.inverse().transform_pos_clamped(pos);
 
             // insert
-            let cp = self
-                .knots
-                .clone()
-                .into_iter()
-                .zip(self.knots_selected.clone().into_iter());
+            let cp = self.knots.clone().into_iter();
 
-            let (head, mut tail): (Vec<_>, Vec<_>) = cp.partition(|(p2, _)| pos.x < p2.x);
+            let (head, mut tail): (Vec<_>, Vec<_>) = cp.partition(|k| pos.x < k.pos.x);
 
-            tail.push((pos, false));
+            tail.push(Knot {
+                pos,
+                selected: false,
+            });
             tail.extend(head);
 
-            (self.knots, self.knots_selected) = tail.into_iter().unzip();
+            self.knots = tail;
             update = true;
         }
 
@@ -262,8 +292,8 @@ impl Splines {
 
         // draw spline
         if self.knots.len() > 3 {
-            let start = self.knots[1].x; // to ensure we have two knots on either side
-            let end = self.knots[self.knots.len() - 2][0];
+            let start = self.knots[1].pos.x; // to ensure we have two knots on either side
+            let end = self.knots[self.knots.len() - 2].pos.x;
 
             let interval = end - start;
             let points: u32 = 1000;
@@ -286,7 +316,7 @@ impl Splines {
         }
 
         // draw connecting lines
-        let points_in_screen: Vec<Pos2> = self.knots.iter().map(|p| to_screen * *p).collect();
+        let points_in_screen: Vec<Pos2> = self.knots.iter().map(|k| to_screen * k.pos).collect();
         painter.add(PathShape::line(points_in_screen, self.line_stroke));
 
         painter.extend(control_point_shapes);
