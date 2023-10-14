@@ -3,7 +3,7 @@ use egui::*;
 use epaint::RectShape;
 use splines::{Interpolation, Key, Spline};
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub struct Knot {
     pos: Pos2,
     selected: bool,
@@ -42,6 +42,7 @@ pub struct Splines {
 }
 
 impl Splines {
+    const SPACE: f32 = 1.0;
     // call to update spline when knots are changed
     fn update(&mut self) {
         self.spline = Spline::from_iter(
@@ -173,31 +174,32 @@ impl Splines {
         if response.dragged_by(PointerButton::Primary) {
             let delta = response.drag_delta();
             println!("dragged {:?}", response.drag_delta());
-
             update = true;
 
             if delta.x > 0.0 {
-                // right
+                // right. we have to update rightmost knot first
                 for i in (0..cp.len()).rev() {
                     if self.knots[i].selected {
                         self.knots[i].pos += delta;
                         if i < cp.len() - 1 {
-                            println!("clamp right i {}", i);
-                            self.knots[i].pos.x =
-                                self.knots[i].pos.x.min(self.knots[i + 1].pos.x - 1.0);
+                            self.knots[i].pos.x = self.knots[i]
+                                .pos
+                                .x
+                                .min(self.knots[i + 1].pos.x - Splines::SPACE);
                         }
                         self.knots[i].pos = to_screen.from().clamp(self.knots[i].pos);
                     }
                 }
             } else {
-                // left
+                // left or up/down, we update leftmost knot first
                 for i in 0..cp.len() {
                     if self.knots[i].selected {
                         self.knots[i].pos += delta;
                         if i > 0 {
-                            println!("clamp left i {}", i);
-                            self.knots[i].pos.x =
-                                self.knots[i].pos.x.max(self.knots[i - 1].pos.x + 1.0);
+                            self.knots[i].pos.x = self.knots[i]
+                                .pos
+                                .x
+                                .max(self.knots[i - 1].pos.x + Splines::SPACE);
                         }
                         self.knots[i].pos = to_screen.from().clamp(self.knots[i].pos);
                     }
@@ -230,24 +232,23 @@ impl Splines {
                 let delta = point_response.drag_delta();
 
                 if delta != Vec2::ZERO {
-                    println!("----";)
-                }
+                    println!("----");
+                    update = true;
 
-                // k.pos += delta;
-                // if delta.x > 0.0 {
-                //     // right
-                //     if i < cp.len() - 1 {
-                //         println!("- clamp right i {}", i);
-                //         k.pos.x = k.pos.x.min(cp[i + 1].pos.x - 1.0);
-                //     }
-                // } else if delta.x < 0.0 {
-                //     // left
-                //     if i > 0 {
-                //         println!("- clamp left i {}", i);
-                //         k.pos.x = k.pos.x.max(cp[i - 1].pos.x + 1.0);
-                //     }
-                // }
-                // k.pos = to_screen.from().clamp(k.pos);
+                    k.pos += delta;
+                    if delta.x > 0.0 {
+                        // right
+                        if i < cp.len() - 1 {
+                            k.pos.x = k.pos.x.min(cp[i + 1].pos.x - Splines::SPACE);
+                        }
+                    } else if delta.x < 0.0 {
+                        // left
+                        if i > 0 {
+                            k.pos.x = k.pos.x.max(cp[i - 1].pos.x + Splines::SPACE);
+                        }
+                    }
+                    k.pos = to_screen.from().clamp(k.pos);
+                }
 
                 let point_in_screen = to_screen.transform_pos(k.pos);
 
@@ -266,15 +267,34 @@ impl Splines {
         // add new point
         if clicked {
             // screen position
-            let pos = response.interact_pointer_pos().unwrap();
-
+            let click_pos = response.interact_pointer_pos().unwrap();
             // data point
-            let pos = to_screen.inverse().transform_pos_clamped(pos);
+            let pos = to_screen.inverse().transform_pos_clamped(click_pos);
 
             // insert
             let cp = self.knots.clone().into_iter();
 
-            let (head, mut tail): (Vec<_>, Vec<_>) = cp.partition(|k| pos.x < k.pos.x);
+            let (head, mut tail): (Vec<_>, Vec<_>) =
+                cp.partition(|k| pos.x < k.pos.x - Splines::SPACE);
+
+            if let Some(tail_fst) = tail.first() {
+                println!("t fst {:?}", tail_fst);
+            }
+
+            if let Some(tail_last) = tail.last() {
+                println!("t last {:?}", tail_last);
+            }
+
+            if let Some(head_fst) = head.first() {
+                println!("h fst {:?}", head_fst);
+                if head_fst.pos.x < pos.x + 2.0 * Splines::SPACE {
+                    println!("!!!!!!!!!!!");
+                }
+            }
+
+            if let Some(head_last) = head.last() {
+                println!("h last  {:?}", head_last);
+            }
 
             tail.push(Knot {
                 pos,
