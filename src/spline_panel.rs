@@ -25,7 +25,7 @@ pub struct Splines {
     spline: Spline<f32, f32>,
 
     /// Cursor
-    cursor: f32,
+    cursor: Pos2,
 }
 
 impl Splines {
@@ -36,6 +36,11 @@ impl Splines {
                 .iter()
                 .map(|p| Key::new(p[0], p[1], Interpolation::CatmullRom)),
         );
+    }
+
+    /// get the cursor position
+    pub fn cursor(&self) -> Pos2 {
+        self.cursor
     }
 }
 
@@ -61,7 +66,7 @@ impl Default for Splines {
             line_stroke: Stroke::new(1.0, Color32::RED.linear_multiply(0.25)),
             spline_stroke: Stroke::new(1.0, Color32::BLUE.linear_multiply(1.0)),
             spline,
-            cursor: 0.0,
+            cursor: Pos2::ZERO,
         }
     }
 }
@@ -224,6 +229,7 @@ impl Splines {
             .interact(response.rect, ui.id(), Sense::hover())
             .hover_pos()
         {
+            self.cursor = pos;
             painter.add(PathShape::line(
                 vec![
                     Pos2 {
