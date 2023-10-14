@@ -9,7 +9,13 @@ pub struct Knot {
     selected: bool,
 }
 
-pub struct Splines {
+pub struct Cut {
+    /// Quantization 4 -> 1/4 = 0.25 (quarter notes), 16-> 1/16 (six teens), etc.
+    quantization: u32,
+
+    /// Length in terms of bars, e.g. 1 amounts to 4 quarter notes, etc.
+    bars: u32,
+
     /// The control points.
     knots: Vec<Knot>,
 
@@ -29,10 +35,19 @@ pub struct Splines {
     select_drag: bool,
 
     /// Stroke for auxiliary lines.
-    line_stroke: Stroke,
+    stroke_line: Stroke,
 
     /// Stroke for splines.
-    spline_stroke: Stroke,
+    stroke_spline: Stroke,
+
+    /// Stroke grid
+    stroke_grid_16: Stroke,
+
+    /// Stroke grid
+    stroke_grid_4: Stroke,
+
+    /// Stroke grid
+    stroke_grid_1: Stroke,
 
     /// Spline
     spline: Spline<f32, f32>,
@@ -41,7 +56,7 @@ pub struct Splines {
     cursor: Pos2,
 }
 
-impl Splines {
+impl Cut {
     const SPACE: f32 = 1.0;
     // call to update spline when knots are changed
     fn update(&mut self) {
@@ -58,7 +73,7 @@ impl Splines {
     }
 }
 
-impl Default for Splines {
+impl Default for Cut {
     fn default() -> Self {
         let knots = vec![
             Knot {
@@ -77,21 +92,26 @@ impl Default for Splines {
         );
 
         Self {
+            quantization: 16,
+            bars: 4,
             knots,
             stroke_default: Stroke::new(1.0, Color32::WHITE.linear_multiply(0.25)),
             stroke_selected: Stroke::new(1.0, Color32::WHITE),
             select_start: Pos2::ZERO,
             select_end: Pos2::ZERO,
             select_drag: false,
-            line_stroke: Stroke::new(1.0, Color32::RED.linear_multiply(0.25)),
-            spline_stroke: Stroke::new(1.0, Color32::BLUE.linear_multiply(1.0)),
+            stroke_line: Stroke::new(1.0, Color32::RED.linear_multiply(0.25)),
+            stroke_spline: Stroke::new(1.0, Color32::BLUE.linear_multiply(1.0)),
+            stroke_grid_16: Stroke::new(1.0, Color32::GRAY.linear_multiply(0.01)),
+            stroke_grid_4: Stroke::new(2.0, Color32::GRAY.linear_multiply(0.10)),
+            stroke_grid_1: Stroke::new(2.0, Color32::GRAY.linear_multiply(0.20)),
             spline,
             cursor: Pos2::ZERO,
         }
     }
 }
 
-impl Splines {
+impl Cut {
     pub fn ui_content(&mut self, ui: &mut Ui) -> egui::Response {
         let (response, painter) = ui.allocate_painter(
             Vec2::new(ui.available_width(), ui.available_height()),
@@ -185,7 +205,7 @@ impl Splines {
                             self.knots[i].pos.x = self.knots[i]
                                 .pos
                                 .x
-                                .min(self.knots[i + 1].pos.x - Splines::SPACE);
+                                .min(self.knots[i + 1].pos.x - Cut::SPACE);
                         }
                         self.knots[i].pos = to_screen.from().clamp(self.knots[i].pos);
                     }
@@ -199,7 +219,7 @@ impl Splines {
                             self.knots[i].pos.x = self.knots[i]
                                 .pos
                                 .x
-                                .max(self.knots[i - 1].pos.x + Splines::SPACE);
+                                .max(self.knots[i - 1].pos.x + Cut::SPACE);
                         }
                         self.knots[i].pos = to_screen.from().clamp(self.knots[i].pos);
                     }
@@ -239,12 +259,12 @@ impl Splines {
                     if delta.x > 0.0 {
                         // right
                         if i < cp.len() - 1 {
-                            k.pos.x = k.pos.x.min(cp[i + 1].pos.x - Splines::SPACE);
+                            k.pos.x = k.pos.x.min(cp[i + 1].pos.x - Cut::SPACE);
                         }
                     } else if delta.x < 0.0 {
                         // left
                         if i > 0 {
-                            k.pos.x = k.pos.x.max(cp[i - 1].pos.x + Splines::SPACE);
+                            k.pos.x = k.pos.x.max(cp[i - 1].pos.x + Cut::SPACE);
                         }
                     }
                     k.pos = to_screen.from().clamp(k.pos);
@@ -274,8 +294,7 @@ impl Splines {
             // insert
             let cp = self.knots.clone().into_iter();
 
-            let (head, mut tail): (Vec<_>, Vec<_>) =
-                cp.partition(|k| pos.x < k.pos.x - Splines::SPACE);
+            let (head, mut tail): (Vec<_>, Vec<_>) = cp.partition(|k| pos.x < k.pos.x - Cut::SPACE);
 
             if let Some(tail_fst) = tail.first() {
                 println!("t fst {:?}", tail_fst);
@@ -287,7 +306,7 @@ impl Splines {
 
             if let Some(head_fst) = head.first() {
                 println!("h fst {:?}", head_fst);
-                if head_fst.pos.x < pos.x + 2.0 * Splines::SPACE {
+                if head_fst.pos.x < pos.x + 2.0 * Cut::SPACE {
                     println!("!!!!!!!!!!!");
                 }
             }
@@ -332,12 +351,12 @@ impl Splines {
                 )
             }
 
-            painter.add(PathShape::line(v, self.spline_stroke));
+            painter.add(PathShape::line(v, self.stroke_spline));
         }
 
-        // draw connecting lines
+        // draw connecting lines for spline
         let points_in_screen: Vec<Pos2> = self.knots.iter().map(|k| to_screen * k.pos).collect();
-        painter.add(PathShape::line(points_in_screen, self.line_stroke));
+        painter.add(PathShape::line(points_in_screen, self.stroke_line));
 
         painter.extend(control_point_shapes);
 
@@ -358,6 +377,36 @@ impl Splines {
                     },
                 ],
                 self.stroke_default,
+            ));
+        }
+
+        // grid
+
+        let width = response.rect.width();
+        let segments = self.bars * self.quantization;
+        let scale = width / (segments as f32);
+
+        for t in 0..segments as usize {
+            painter.add(PathShape::line(
+                vec![
+                    to_screen
+                        * Pos2 {
+                            x: t as f32 * scale,
+                            y: 0.0,
+                        },
+                    to_screen
+                        * Pos2 {
+                            x: t as f32 * scale,
+                            y: response.rect.height(),
+                        },
+                ],
+                if t % (16) == 0 {
+                    self.stroke_grid_1
+                } else if t % 4 == 0 {
+                    self.stroke_grid_4
+                } else {
+                    self.stroke_grid_16
+                },
             ));
         }
 

@@ -1,6 +1,6 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
 
-use cut_creator::{spline_panel::Splines, wav_panel::Wav};
+use cut_creator::{cut_panel::Cut, wav_panel::Wav};
 
 fn main() -> Result<(), eframe::Error> {
     env_logger::init(); // Log to stderr (if you run with `RUST_LOG=debug`).
@@ -18,7 +18,7 @@ fn main() -> Result<(), eframe::Error> {
 
 #[derive(Default)]
 struct App {
-    splines: Splines,
+    cut: Cut,
     wav: Wav,
 }
 
@@ -31,14 +31,14 @@ impl eframe::App for App {
                     ui.heading("Audio");
                     egui::Frame::canvas(ui.style()).show(ui, |ui| {
                         ui.set_min_width(100.0);
-                        self.wav.ui_content(ui, self.splines.cursor());
+                        self.wav.ui_content(ui, self.cut.cursor());
                     });
                 });
                 // the splines
                 egui::CentralPanel::default().show(ctx, |ui| {
                     ui.heading("Cut");
                     egui::Frame::canvas(ui.style()).show(ui, |ui| {
-                        self.splines.ui_content(ui);
+                        self.cut.ui_content(ui);
                     })
                 });
             });
