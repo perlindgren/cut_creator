@@ -42,6 +42,18 @@ pub struct Cut {
     /// Select drag
     select_drag: bool,
 
+    /// Move drag
+    move_drag: bool,
+
+    /// Pos for the start of moving points
+    move_start: Pos2,
+
+    /// Last position when moving
+    move_last: Pos2,
+
+    /// Start positions for each knot
+    move_knots: Vec<Pos2>,
+
     /// Stroke for auxiliary lines.
     stroke_line: Stroke,
 
@@ -125,6 +137,10 @@ impl Default for Cut {
             select_start: Pos2::ZERO,
             select_end: Pos2::ZERO,
             select_drag: false,
+            move_drag: false,
+            move_start: Pos2::ZERO,
+            move_last: Pos2::ZERO,
+            move_knots: vec![],
             stroke_line: Stroke::new(1.0, Color32::RED.linear_multiply(0.25)),
             stroke_spline: Stroke::new(1.0, Color32::BLUE.linear_multiply(1.0)),
             stroke_grid_16: Stroke::new(1.0, Color32::GRAY.linear_multiply(0.01)),
@@ -235,42 +251,70 @@ impl Cut {
         }
 
         let cp = self.knots.clone();
-        // // drag all knots
-        // if response.dragged_by(PointerButton::Primary) {
-        //     let delta = response.drag_delta();
-        //     println!("dragged {:?}", response.drag_delta());
-        //     update = true;
+        // drag all knots
+        if response.drag_started_by(PointerButton::Primary) {
+            self.move_drag = true;
+            self.move_start = response.interact_pointer_pos().unwrap();
+            self.move_last = self.move_start;
+            self.move_knots = self.knots.iter().map(|k| k.pos).collect();
+            println!("start move {:?}", self.move_start);
+        }
 
-        //     if delta.x > 0.0 {
-        //         // right. we have to update rightmost knot first
-        //         for i in (0..cp.len()).rev() {
-        //             if self.knots[i].selected {
-        //                 self.knots[i].pos += delta;
-        //                 if i < cp.len() - 1 {
-        //                     self.knots[i].pos.x = self.knots[i]
-        //                         .pos
-        //                         .x
-        //                         .min(self.knots[i + 1].pos.x - Cut::SPACE);
-        //                 }
-        //                 self.knots[i].pos = to_screen.from().clamp(self.knots[i].pos);
-        //             }
-        //         }
-        //     } else {
-        //         // left or up/down, we update leftmost knot first
-        //         for i in 0..cp.len() {
-        //             if self.knots[i].selected {
-        //                 self.knots[i].pos += delta;
-        //                 if i > 0 {
-        //                     self.knots[i].pos.x = self.knots[i]
-        //                         .pos
-        //                         .x
-        //                         .max(self.knots[i - 1].pos.x + Cut::SPACE);
-        //                 }
-        //                 self.knots[i].pos = to_screen.from().clamp(self.knots[i].pos);
-        //             }
-        //         }
-        //     }
-        // }
+        if response.drag_released_by(PointerButton::Primary) {
+            self.move_drag = true;
+            println!("end move");
+            self.move_drag = false;
+        }
+
+        if response.dragged_by(PointerButton::Primary) {
+            let scr_pos = response.interact_pointer_pos().unwrap();
+            update = true;
+            let delta = scr_pos - self.move_last;
+            self.move_last = scr_pos;
+
+            let rel = scr_pos - self.move_start;
+            // let rel = Pos2 { x: rel.x, y: rel.y };
+            let bar_rel = bars_to_screen.inverse().scale() * rel;
+
+            println!("rel {:?}, k rel {:?}", rel, bar_rel);
+
+            if delta.x > 0.0 {
+                println!("right");
+                // right. we have to update rightmost knot first
+                for i in (0..cp.len()).rev() {
+                    if self.knots[i].selected {
+                        println!("i {} ", i);
+                        self.knots[i].pos.y = self.move_knots[i].y + bar_rel.y;
+                        // self.knots.pos.x
+                        //                 self.knots[i].pos += delta;
+                        //                 if i < cp.len() - 1 {
+                        //                     self.knots[i].pos.x = self.knots[i]
+                        //                         .pos
+                        //                         .x
+                        //                         .min(self.knots[i + 1].pos.x - Cut::SPACE);
+                        //                 }
+                        //                 self.knots[i].pos = to_screen.from().clamp(self.knots[i].pos);
+                    }
+                }
+            } else {
+                println!("left");
+                // left or up/down, we update leftmost knot first
+                for i in 0..cp.len() {
+                    if self.knots[i].selected {
+                        println!("i {} ", i);
+                        self.knots[i].pos.y = self.move_knots[i].y + bar_rel.y;
+                        //                 self.knots[i].pos += delta;
+                        //                 if i > 0 {
+                        //                     self.knots[i].pos.x = self.knots[i]
+                        //                         .pos
+                        //                         .x
+                        //                         .max(self.knots[i - 1].pos.x + Cut::SPACE);
+                        //                 }
+                        //                 self.knots[i].pos = to_screen.from().clamp(self.knots[i].pos);
+                    }
+                }
+            }
+        }
 
         let control_point_radius = 8.0;
         // knots
