@@ -190,7 +190,7 @@ impl Cut {
 
         if response.drag_started_by(PointerButton::Secondary) {
             let pos = response.interact_pointer_pos().unwrap();
-            println!("dragged_start {:?} ", pos);
+            println!("select start {:?}", pos);
             self.select_start = pos;
             self.select_end = pos;
             self.select_drag = true;
@@ -198,11 +198,11 @@ impl Cut {
 
         if response.drag_released_by(PointerButton::Secondary) {
             let pos = response.interact_pointer_pos().unwrap();
-            println!("dragged_release {:?} ", pos);
+            println!("select end {:?} ", pos);
             let rect = Rect::from_two_pos(self.select_start, self.select_end);
 
             self.knots.iter_mut().enumerate().for_each(|(i, k)| {
-                if rect.contains(to_screen * k.pos) {
+                if rect.contains(bars_to_screen * k.pos) {
                     k.selected ^= true;
                 }
             });
@@ -213,7 +213,7 @@ impl Cut {
 
         if response.dragged_by(PointerButton::Secondary) {
             let pos = response.interact_pointer_pos().unwrap();
-            println!("dragged_by {:?}", pos);
+            println!("select changed {:?}", pos);
 
             self.select_end = pos;
         }
