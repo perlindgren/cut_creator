@@ -62,6 +62,8 @@ pub struct Cut {
 
     /// Cursor
     cursor: Pos2,
+    // /// drag
+    // knot_drag: Option<Pos>
 }
 
 impl Cut {
@@ -171,8 +173,13 @@ impl Cut {
         // delete knot
         if ui.input(|i| i.key_pressed(egui::Key::Delete)) {
             println!("delete");
+            let mut index = 0;
+            let len = self.knots.len();
 
-            self.knots.retain(|k| !k.selected);
+            self.knots.retain(|k| {
+                index += 1;
+                !(k.selected && index > 1 && index < len)
+            });
 
             update = true;
         }
@@ -228,42 +235,42 @@ impl Cut {
         }
 
         let cp = self.knots.clone();
-        // drag all knots
-        if response.dragged_by(PointerButton::Primary) {
-            let delta = response.drag_delta();
-            println!("dragged {:?}", response.drag_delta());
-            update = true;
+        // // drag all knots
+        // if response.dragged_by(PointerButton::Primary) {
+        //     let delta = response.drag_delta();
+        //     println!("dragged {:?}", response.drag_delta());
+        //     update = true;
 
-            if delta.x > 0.0 {
-                // right. we have to update rightmost knot first
-                for i in (0..cp.len()).rev() {
-                    if self.knots[i].selected {
-                        self.knots[i].pos += delta;
-                        if i < cp.len() - 1 {
-                            self.knots[i].pos.x = self.knots[i]
-                                .pos
-                                .x
-                                .min(self.knots[i + 1].pos.x - Cut::SPACE);
-                        }
-                        self.knots[i].pos = to_screen.from().clamp(self.knots[i].pos);
-                    }
-                }
-            } else {
-                // left or up/down, we update leftmost knot first
-                for i in 0..cp.len() {
-                    if self.knots[i].selected {
-                        self.knots[i].pos += delta;
-                        if i > 0 {
-                            self.knots[i].pos.x = self.knots[i]
-                                .pos
-                                .x
-                                .max(self.knots[i - 1].pos.x + Cut::SPACE);
-                        }
-                        self.knots[i].pos = to_screen.from().clamp(self.knots[i].pos);
-                    }
-                }
-            }
-        }
+        //     if delta.x > 0.0 {
+        //         // right. we have to update rightmost knot first
+        //         for i in (0..cp.len()).rev() {
+        //             if self.knots[i].selected {
+        //                 self.knots[i].pos += delta;
+        //                 if i < cp.len() - 1 {
+        //                     self.knots[i].pos.x = self.knots[i]
+        //                         .pos
+        //                         .x
+        //                         .min(self.knots[i + 1].pos.x - Cut::SPACE);
+        //                 }
+        //                 self.knots[i].pos = to_screen.from().clamp(self.knots[i].pos);
+        //             }
+        //         }
+        //     } else {
+        //         // left or up/down, we update leftmost knot first
+        //         for i in 0..cp.len() {
+        //             if self.knots[i].selected {
+        //                 self.knots[i].pos += delta;
+        //                 if i > 0 {
+        //                     self.knots[i].pos.x = self.knots[i]
+        //                         .pos
+        //                         .x
+        //                         .max(self.knots[i - 1].pos.x + Cut::SPACE);
+        //                 }
+        //                 self.knots[i].pos = to_screen.from().clamp(self.knots[i].pos);
+        //             }
+        //         }
+        //     }
+        // }
 
         let control_point_radius = 8.0;
         // knots
@@ -273,7 +280,7 @@ impl Cut {
             .enumerate()
             .map(|(i, k)| {
                 let size = Vec2::splat(2.0 * control_point_radius);
-                let point_in_screen = bars_to_screen * k.pos;
+                let mut point_in_screen = bars_to_screen * k.pos;
                 // println!("k {:?}, point in screen {:?}", k, point_in_screen);
 
                 let point_rect = Rect::from_center_size(point_in_screen, size);
@@ -288,24 +295,37 @@ impl Cut {
                 }
 
                 let point_response = ui.interact(point_rect, point_id, Sense::drag());
-                let delta = point_response.drag_delta();
 
-                if delta != Vec2::ZERO {
-                    update = true;
+                if point_response.drag_released() {
+                    println!("released");
+                }
 
-                    k.pos += delta;
-                    if delta.x > 0.0 {
-                        // right
-                        if i < cp.len() - 1 {
-                            k.pos.x = k.pos.x.min(cp[i + 1].pos.x - Cut::SPACE);
-                        }
-                    } else if delta.x < 0.0 {
-                        // left
-                        if i > 0 {
-                            k.pos.x = k.pos.x.max(cp[i - 1].pos.x + Cut::SPACE);
+                if point_response.dragged() {
+                    // let delta = point_response.drag_delta();
+                    let pos = point_response.interact_pointer_pos().unwrap();
+                    let mut knot_pos = bars_to_screen.inverse().transform_pos(pos);
+                    println!("single_knot_drag {:?}", knot_pos.x);
+                    knot_pos.x = (knot_pos.x * (self.quantization as f32)).round()
+                        / (self.quantization as f32);
+                    println!("rounded {:?}", knot_pos.x);
+
+                    // never move first and last knots in x direction
+                    if i > 0 && i < cp.len() - 1 {
+                        if knot_pos.x > k.pos.x {
+                            // right
+                            if knot_pos.x < cp[i + 1].pos.x {
+                                k.pos.x = knot_pos.x;
+                            }
+                        } else if knot_pos.x < k.pos.x {
+                            // left
+                            if knot_pos.x > cp[i - 1].pos.x {
+                                k.pos.x = knot_pos.x;
+                            }
                         }
                     }
-                    k.pos = to_screen.from().clamp(k.pos);
+
+                    k.pos.y = knot_pos.y.min(1.0).max(0.0); // clamp to range
+                    update = true;
                 }
 
                 Shape::circle_stroke(
@@ -409,10 +429,10 @@ impl Cut {
 
             let logic_pos = to_screen.inverse().transform_pos(pos);
             let segment_pos = logic_pos.x / scale;
-            println!(
-                "pos {:?}, logic_pos {:?}, segment_pos {:?}",
-                pos, logic_pos, segment_pos
-            );
+            // println!(
+            //     "pos {:?}, logic_pos {:?}, segment_pos {:?}",
+            //     pos, logic_pos, segment_pos
+            // );
             let round_segment_x = segment_pos.round();
 
             let logic_x = round_segment_x * scale;
