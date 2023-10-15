@@ -1,5 +1,5 @@
+use egui::epaint::PathShape;
 use egui::*;
-use egui::{emath::RectTransform, epaint::PathShape};
 use epaint::RectShape;
 use splines::{Interpolation, Key, Spline};
 
@@ -11,11 +11,11 @@ pub struct Knot {
     selected: bool,
 }
 
-impl Knot {
-    fn knot_round(&self, trans: RectTransform) -> Knot {
-        unimplemented!()
-    }
-}
+// impl Knot {
+//     fn knot_round(&self, trans: RectTransform) -> Knot {
+//         unimplemented!()
+//     }
+// }
 
 pub struct Cut {
     /// Quantization 4 -> 1/4 = 0.25 (quarter notes), 16-> 1/16 (six teens), etc.
@@ -79,8 +79,6 @@ pub struct Cut {
 }
 
 impl Cut {
-    const SPACE: f32 = 1.0;
-
     // call to update spline when knots are changed
     fn update(&mut self) {
         self.spline = Spline::from_iter(
@@ -224,7 +222,7 @@ impl Cut {
             println!("select end {:?} ", pos);
             let rect = Rect::from_two_pos(self.select_start, self.select_end);
 
-            self.knots.iter_mut().enumerate().for_each(|(i, k)| {
+            self.knots.iter_mut().for_each(|k| {
                 if rect.contains(bars_to_screen * k.pos) {
                     k.selected ^= true;
                 }
@@ -267,13 +265,12 @@ impl Cut {
         }
 
         if response.dragged_by(PointerButton::Primary) {
-            let scr_pos = response.interact_pointer_pos().unwrap();
             update = true;
+            let scr_pos = response.interact_pointer_pos().unwrap();
             let delta = scr_pos - self.move_last;
             self.move_last = scr_pos;
 
             let rel = scr_pos - self.move_start;
-            // let rel = Pos2 { x: rel.x, y: rel.y };
             let bar_rel = bars_to_screen.inverse().scale() * rel;
 
             println!("rel {:?}, k rel {:?}", rel, bar_rel);
@@ -281,37 +278,48 @@ impl Cut {
             if delta.x > 0.0 {
                 println!("right");
                 // right. we have to update rightmost knot first
-                for i in (0..cp.len()).rev() {
+                // exclude first and last knot
+                for i in (1..cp.len() - 1).rev() {
                     if self.knots[i].selected {
-                        println!("i {} ", i);
-                        self.knots[i].pos.y = self.move_knots[i].y + bar_rel.y;
-                        // self.knots.pos.x
-                        //                 self.knots[i].pos += delta;
-                        //                 if i < cp.len() - 1 {
-                        //                     self.knots[i].pos.x = self.knots[i]
-                        //                         .pos
-                        //                         .x
-                        //                         .min(self.knots[i + 1].pos.x - Cut::SPACE);
-                        //                 }
-                        //                 self.knots[i].pos = to_screen.from().clamp(self.knots[i].pos);
+                        let knot_pos_x = ((self.move_knots[i].x + bar_rel.x)
+                            * (self.quantization as f32))
+                            .round()
+                            / (self.quantization as f32);
+
+                        if knot_pos_x < self.knots[i + 1].pos.x
+                            && knot_pos_x > self.knots[i - 1].pos.x
+                        {
+                            self.knots[i].pos.x = knot_pos_x;
+                        }
                     }
                 }
-            } else {
+            } else if delta.x < 0.0 {
                 println!("left");
-                // left or up/down, we update leftmost knot first
-                for i in 0..cp.len() {
+                // left we update leftmost knot first
+                // we exclude first and last knot
+                for i in 1..cp.len() - 1 {
                     if self.knots[i].selected {
                         println!("i {} ", i);
-                        self.knots[i].pos.y = self.move_knots[i].y + bar_rel.y;
-                        //                 self.knots[i].pos += delta;
-                        //                 if i > 0 {
-                        //                     self.knots[i].pos.x = self.knots[i]
-                        //                         .pos
-                        //                         .x
-                        //                         .max(self.knots[i - 1].pos.x + Cut::SPACE);
-                        //                 }
-                        //                 self.knots[i].pos = to_screen.from().clamp(self.knots[i].pos);
+
+                        let knot_pos_x = ((self.move_knots[i].x + bar_rel.x)
+                            * (self.quantization as f32))
+                            .round()
+                            / (self.quantization as f32);
+
+                        if knot_pos_x > self.knots[i - 1].pos.x
+                            && knot_pos_x < self.knots[i + 1].pos.x
+                        {
+                            self.knots[i].pos.x = knot_pos_x;
+                        }
                     }
+                }
+            }
+            println!("none");
+            // left or up/down, we update leftmost knot first
+            for i in 0..cp.len() {
+                if self.knots[i].selected {
+                    println!("i {} ", i);
+                    self.knots[i].pos.y = (self.move_knots[i].y + bar_rel.y).min(1.0).max(0.0);
                 }
             }
         }
@@ -324,8 +332,7 @@ impl Cut {
             .enumerate()
             .map(|(i, k)| {
                 let size = Vec2::splat(2.0 * control_point_radius);
-                let mut point_in_screen = bars_to_screen * k.pos;
-                // println!("k {:?}, point in screen {:?}", k, point_in_screen);
+                let point_in_screen = bars_to_screen * k.pos;
 
                 let point_rect = Rect::from_center_size(point_in_screen, size);
 
@@ -345,7 +352,6 @@ impl Cut {
                 }
 
                 if point_response.dragged() {
-                    // let delta = point_response.drag_delta();
                     let pos = point_response.interact_pointer_pos().unwrap();
                     let mut knot_pos = bars_to_screen.inverse().transform_pos(pos);
                     println!("single_knot_drag {:?}", knot_pos.x);
