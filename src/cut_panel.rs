@@ -327,9 +327,7 @@ impl Cut {
             // data point
             let mut pos = bars_to_screen.inverse().transform_pos_clamped(click_pos);
 
-            let round_x = (pos.x * segments as f32).round() / (segments as f32);
-
-            println!("clicked pos {:?} round_x {}", pos, round_x);
+            let round_x = (pos.x * self.quantization as f32).round() / (self.quantization as f32);
 
             pos.x = round_x;
 
@@ -342,7 +340,6 @@ impl Cut {
                 .find_map(|k| {
                     if k.pos.x == pos.x {
                         k.pos.y = pos.y;
-                        println!("---------- update ");
                         Some(())
                     } else {
                         None
@@ -351,27 +348,7 @@ impl Cut {
                 .is_none()
             {
                 println!("new point");
-
                 let (head, mut tail): (Vec<_>, Vec<_>) = cp.partition(|k| pos.x < k.pos.x);
-
-                if let Some(tail_fst) = tail.first() {
-                    println!("t fst {:?}", tail_fst);
-                }
-
-                if let Some(tail_last) = tail.last() {
-                    println!("t last {:?}", tail_last);
-                }
-
-                if let Some(head_fst) = head.first() {
-                    println!("h fst {:?}", head_fst);
-                    if head_fst.pos.x < pos.x + 2.0 * Cut::SPACE {
-                        println!("!!!!!!!!!!!");
-                    }
-                }
-
-                if let Some(head_last) = head.last() {
-                    println!("h last  {:?}", head_last);
-                }
 
                 tail.push(Knot {
                     pos,
