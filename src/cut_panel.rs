@@ -479,10 +479,6 @@ impl Cut {
 
             let logic_pos = to_screen.inverse().transform_pos(pos);
             let segment_pos = logic_pos.x / scale;
-            // println!(
-            //     "pos {:?}, logic_pos {:?}, segment_pos {:?}",
-            //     pos, logic_pos, segment_pos
-            // );
             let round_segment_x = segment_pos.round();
 
             let logic_x = round_segment_x * scale;
