@@ -1,12 +1,20 @@
-use egui::epaint::PathShape;
 use egui::*;
+use egui::{emath::RectTransform, epaint::PathShape};
 use epaint::RectShape;
 use splines::{Interpolation, Key, Spline};
 
 #[derive(Copy, Clone, Debug)]
 pub struct Knot {
+    /// x position in terms of bars. 0.25 -> 1st quarter in 1st bar
+    /// y position in terms of relative sample position 0.0 beginning of sample 1.0 end of sample.
     pos: Pos2,
     selected: bool,
+}
+
+impl Knot {
+    fn knot_round(&self, trans: RectTransform) -> Knot {
+        unimplemented!()
+    }
 }
 
 pub struct Cut {
@@ -58,6 +66,7 @@ pub struct Cut {
 
 impl Cut {
     const SPACE: f32 = 1.0;
+
     // call to update spline when knots are changed
     fn update(&mut self) {
         self.spline = Spline::from_iter(
@@ -76,12 +85,26 @@ impl Cut {
 impl Default for Cut {
     fn default() -> Self {
         let knots = vec![
+            // start top left
             Knot {
                 pos: pos2(0.0, 0.0),
                 selected: false,
             },
             Knot {
-                pos: pos2(400.0, 0.0),
+                pos: pos2(1.0, 0.25),
+                selected: false,
+            },
+            Knot {
+                pos: pos2(2.0, 0.5),
+                selected: false,
+            },
+            Knot {
+                pos: pos2(3.0, 0.75),
+                selected: false,
+            },
+            // end bottom right
+            Knot {
+                pos: pos2(4.0, 1.0),
                 selected: false,
             },
         ];
@@ -122,6 +145,21 @@ impl Cut {
             Rect::from_min_size(Pos2::ZERO, response.rect.size()),
             response.rect,
         );
+
+        // panel_pos relation to bars
+        let width = response.rect.width();
+        let segments = self.bars * self.quantization;
+        let scale = width / (segments as f32);
+
+        let bars_rect = Rect::from_min_max(
+            Pos2::ZERO,
+            Pos2 {
+                x: self.bars as f32,
+                y: 1.0,
+            },
+        );
+
+        let bars_to_screen = emath::RectTransform::from_to(bars_rect, response.rect);
 
         let mut clicked = response.clicked();
         let mut update = false;
@@ -235,8 +273,9 @@ impl Cut {
             .enumerate()
             .map(|(i, k)| {
                 let size = Vec2::splat(2.0 * control_point_radius);
+                let point_in_screen = bars_to_screen * k.pos;
+                // println!("k {:?}, point in screen {:?}", k, point_in_screen);
 
-                let point_in_screen = to_screen.transform_pos(k.pos);
                 let point_rect = Rect::from_center_size(point_in_screen, size);
 
                 let point_id = response.id.with(i);
@@ -252,7 +291,6 @@ impl Cut {
                 let delta = point_response.drag_delta();
 
                 if delta != Vec2::ZERO {
-                    println!("----");
                     update = true;
 
                     k.pos += delta;
@@ -269,8 +307,6 @@ impl Cut {
                     }
                     k.pos = to_screen.from().clamp(k.pos);
                 }
-
-                let point_in_screen = to_screen.transform_pos(k.pos);
 
                 Shape::circle_stroke(
                     point_in_screen,
@@ -289,39 +325,64 @@ impl Cut {
             // screen position
             let click_pos = response.interact_pointer_pos().unwrap();
             // data point
-            let pos = to_screen.inverse().transform_pos_clamped(click_pos);
+            let mut pos = bars_to_screen.inverse().transform_pos_clamped(click_pos);
 
-            // insert
+            let round_x = (pos.x * segments as f32).round() / (segments as f32);
+
+            println!("clicked pos {:?} round_x {}", pos, round_x);
+
+            pos.x = round_x;
+
+            // insert, or move
             let cp = self.knots.clone().into_iter();
 
-            let (head, mut tail): (Vec<_>, Vec<_>) = cp.partition(|k| pos.x < k.pos.x - Cut::SPACE);
+            if self
+                .knots
+                .iter_mut()
+                .find_map(|k| {
+                    if k.pos.x == pos.x {
+                        k.pos.y = pos.y;
+                        println!("---------- update ");
+                        Some(())
+                    } else {
+                        None
+                    }
+                })
+                .is_none()
+            {
+                println!("new point");
 
-            if let Some(tail_fst) = tail.first() {
-                println!("t fst {:?}", tail_fst);
-            }
+                let (head, mut tail): (Vec<_>, Vec<_>) = cp.partition(|k| pos.x < k.pos.x);
 
-            if let Some(tail_last) = tail.last() {
-                println!("t last {:?}", tail_last);
-            }
-
-            if let Some(head_fst) = head.first() {
-                println!("h fst {:?}", head_fst);
-                if head_fst.pos.x < pos.x + 2.0 * Cut::SPACE {
-                    println!("!!!!!!!!!!!");
+                if let Some(tail_fst) = tail.first() {
+                    println!("t fst {:?}", tail_fst);
                 }
+
+                if let Some(tail_last) = tail.last() {
+                    println!("t last {:?}", tail_last);
+                }
+
+                if let Some(head_fst) = head.first() {
+                    println!("h fst {:?}", head_fst);
+                    if head_fst.pos.x < pos.x + 2.0 * Cut::SPACE {
+                        println!("!!!!!!!!!!!");
+                    }
+                }
+
+                if let Some(head_last) = head.last() {
+                    println!("h last  {:?}", head_last);
+                }
+
+                tail.push(Knot {
+                    pos,
+                    selected: false,
+                });
+                tail.extend(head);
+
+                self.knots = tail;
+
+                println!("knots {:?}", self.knots);
             }
-
-            if let Some(head_last) = head.last() {
-                println!("h last  {:?}", head_last);
-            }
-
-            tail.push(Knot {
-                pos,
-                selected: false,
-            });
-            tail.extend(head);
-
-            self.knots = tail;
             update = true;
         }
 
@@ -343,7 +404,7 @@ impl Cut {
             for i in 0..points {
                 let t = i as f32 * step + start;
                 v.push(
-                    to_screen
+                    bars_to_screen
                         * Pos2 {
                             x: t,
                             y: self.spline.sample(t).unwrap(),
@@ -355,37 +416,44 @@ impl Cut {
         }
 
         // draw connecting lines for spline
-        let points_in_screen: Vec<Pos2> = self.knots.iter().map(|k| to_screen * k.pos).collect();
+        let points_in_screen: Vec<Pos2> =
+            self.knots.iter().map(|k| bars_to_screen * k.pos).collect();
         painter.add(PathShape::line(points_in_screen, self.stroke_line));
 
+        // knots
         painter.extend(control_point_shapes);
 
+        // hover line
         if let Some(pos) = ui
             .interact(response.rect, ui.id(), Sense::hover())
             .hover_pos()
         {
             self.cursor = pos;
-            painter.add(PathShape::line(
+
+            let logic_pos = to_screen.inverse().transform_pos(pos);
+            let segment_pos = logic_pos.x / scale;
+            println!(
+                "pos {:?}, logic_pos {:?}, segment_pos {:?}",
+                pos, logic_pos, segment_pos
+            );
+            let round_segment_x = segment_pos.round();
+
+            let logic_x = round_segment_x * scale;
+
+            let _segment = painter.add(PathShape::line(
                 vec![
-                    Pos2 {
-                        x: pos.x,
-                        y: response.rect.top(),
-                    },
-                    Pos2 {
-                        x: pos.x,
-                        y: response.rect.bottom(),
-                    },
+                    to_screen * Pos2 { x: logic_x, y: 0.0 },
+                    to_screen
+                        * Pos2 {
+                            x: logic_x,
+                            y: response.rect.height(),
+                        },
                 ],
                 self.stroke_default,
             ));
         }
 
         // grid
-
-        let width = response.rect.width();
-        let segments = self.bars * self.quantization;
-        let scale = width / (segments as f32);
-
         for t in 0..segments as usize {
             painter.add(PathShape::line(
                 vec![
