@@ -3,6 +3,15 @@ use egui::*;
 use epaint::RectShape;
 use splines::{Interpolation, Key, Spline};
 
+/// cut_panel
+///
+/// A cut is defined by a spline with CatmullRom interpolation.
+/// Left and right knots are outside of the cut region by 1/4 bar.
+/// Second left endpoint defines S the start position of the sample.
+/// Second right endpoint defines E the end position of the sample.
+///
+/// The loop option forces S <-> E, which ensures that the cut can be smoothly looped.
+
 #[derive(Copy, Clone, Debug)]
 pub struct Knot {
     /// x position in terms of bars. 0.25 -> 1st quarter in 1st bar
@@ -21,8 +30,8 @@ pub struct Cut {
     /// Quantization 4 -> 1/4 = 0.25 (quarter notes), 16-> 1/16 (six teens), etc.
     quantization: u32,
 
-    /// Length in terms of bars, e.g. 1 amounts to 4 quarter notes, etc.
-    bars: u32,
+    /// Length in terms of bars, e.g. 1.0 amounts to 4 quarter notes, etc.
+    bars: f32,
 
     /// The control points.
     knots: Vec<Knot>,
@@ -81,10 +90,14 @@ pub struct Cut {
 impl Cut {
     // call to update spline when knots are changed
     fn update(&mut self) {
+        let len = self.knots.len();
+        // ensure that endpoints are aligned
+        self.knots[0].pos.y = self.knots[1].pos.y;
+        self.knots[len - 1].pos.y = self.knots[len - 2].pos.y;
         self.spline = Spline::from_iter(
             self.knots
                 .iter()
-                .map(|p| Key::new(p.pos.x, p.pos.y, Interpolation::CatmullRom)),
+                .map(|k| Key::new(k.pos.x, k.pos.y, Interpolation::CatmullRom)),
         );
     }
 
@@ -99,24 +112,24 @@ impl Default for Cut {
         let knots = vec![
             // start top left
             Knot {
+                pos: pos2(-0.25, 0.0),
+                selected: false,
+            },
+            Knot {
                 pos: pos2(0.0, 0.0),
                 selected: false,
             },
             Knot {
-                pos: pos2(1.0, 0.25),
+                pos: pos2(1.0, 0.5),
                 selected: false,
             },
             Knot {
-                pos: pos2(2.0, 0.5),
+                pos: pos2(2.0, 1.0),
                 selected: false,
             },
+            // end top right
             Knot {
-                pos: pos2(3.0, 0.75),
-                selected: false,
-            },
-            // end bottom right
-            Knot {
-                pos: pos2(4.0, 1.0),
+                pos: pos2(2.25, 1.0),
                 selected: false,
             },
         ];
@@ -128,7 +141,7 @@ impl Default for Cut {
 
         Self {
             quantization: 16,
-            bars: 4,
+            bars: 2.0,
             knots,
             stroke_default: Stroke::new(1.0, Color32::WHITE.linear_multiply(0.25)),
             stroke_selected: Stroke::new(1.0, Color32::WHITE),
@@ -164,8 +177,8 @@ impl Cut {
 
         // panel_pos relation to bars
         let width = response.rect.width();
-        let segments = self.bars * self.quantization;
-        let scale = width / (segments as f32);
+        let segments = self.bars * self.quantization as f32;
+        let scale = width / segments;
 
         let bars_rect = Rect::from_min_max(
             Pos2::ZERO,
@@ -192,7 +205,7 @@ impl Cut {
 
             self.knots.retain(|k| {
                 index += 1;
-                !(k.selected && index > 1 && index < len)
+                !(k.selected && index > 2 && index < len - 1)
             });
 
             update = true;
@@ -278,8 +291,8 @@ impl Cut {
             if delta.x > 0.0 {
                 println!("right");
                 // right. we have to update rightmost knot first
-                // exclude first and last knot
-                for i in (1..cp.len() - 1).rev() {
+                // exclude first 2 and last 2 knots, they have fixed x positions
+                for i in (2..cp.len() - 2).rev() {
                     if self.knots[i].selected {
                         let knot_pos_x = ((self.move_knots[i].x + bar_rel.x)
                             * (self.quantization as f32))
@@ -296,8 +309,8 @@ impl Cut {
             } else if delta.x < 0.0 {
                 println!("left");
                 // left we update leftmost knot first
-                // we exclude first and last knot
-                for i in 1..cp.len() - 1 {
+                // we exclude first 2 and last 2 knots, they have fixed positions
+                for i in 2..cp.len() - 2 {
                     if self.knots[i].selected {
                         println!("i {} ", i);
 
@@ -359,8 +372,8 @@ impl Cut {
                         / (self.quantization as f32);
                     println!("rounded {:?}", knot_pos.x);
 
-                    // never move first and last knots in x direction
-                    if i > 0 && i < cp.len() - 1 {
+                    // never move first 2 and last 2 knots in x direction
+                    if i > 1 && i < cp.len() - 2 {
                         if knot_pos.x > k.pos.x {
                             // right
                             if knot_pos.x < cp[i + 1].pos.x {
@@ -375,6 +388,7 @@ impl Cut {
                     }
 
                     k.pos.y = knot_pos.y.min(1.0).max(0.0); // clamp to range
+
                     update = true;
                 }
 
