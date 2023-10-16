@@ -464,13 +464,16 @@ impl Cut {
 
             for i in 0..points {
                 let t = i as f32 * step + start;
-                v.push(
-                    bars_to_screen
-                        * Pos2 {
-                            x: t,
-                            y: self.spline.sample(t).unwrap(),
-                        },
-                )
+                let y = self.spline.sample(t).unwrap();
+                let y = if y > 1.0 {
+                    y - 1.0
+                } else if y < 0.0 {
+                    y + 1.0
+                } else {
+                    y
+                };
+
+                v.push(bars_to_screen * Pos2 { x: t, y })
             }
 
             painter.add(PathShape::line(v, self.stroke_spline));
