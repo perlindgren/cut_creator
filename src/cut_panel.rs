@@ -83,7 +83,7 @@ pub struct Cut {
     spline: Spline<f32, f32>,
 
     /// Cursor
-    cursor: Pos2,
+    cursor: Option<Pos2>,
     // /// drag
     // knot_drag: Option<Pos>
 }
@@ -103,7 +103,7 @@ impl Cut {
     }
 
     /// get the cursor position
-    pub fn cursor(&self) -> Pos2 {
+    pub fn get_cursor(&self) -> Option<Pos2> {
         self.cursor
     }
 }
@@ -159,7 +159,7 @@ impl Default for Cut {
             stroke_grid_4: Stroke::new(2.0, Color32::GRAY.linear_multiply(0.10)),
             stroke_grid_1: Stroke::new(2.0, Color32::GRAY.linear_multiply(0.20)),
             spline,
-            cursor: Pos2::ZERO,
+            cursor: None,
         }
     }
 }
@@ -497,7 +497,7 @@ impl Cut {
             .interact(response.rect, ui.id(), Sense::hover())
             .hover_pos()
         {
-            self.cursor = pos;
+            self.cursor = Some(pos);
 
             let logic_pos = to_screen.inverse().transform_pos(pos);
             let segment_pos = logic_pos.x / scale;
@@ -516,6 +516,8 @@ impl Cut {
                 ],
                 self.stroke_default,
             ));
+        } else {
+            self.cursor = None;
         }
 
         // grid

@@ -26,24 +26,24 @@ struct App {
 impl eframe::App for App {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         egui::CentralPanel::default().show(ctx, |ui| {
-            ui.horizontal(|ui| {
+            ui.horizontal(|_ui| {
                 // the waveform
                 egui::SidePanel::right("Right").show(ctx, |ui| {
                     ui.heading("Audio");
                     ui.vertical_centered(|ui| {
-                        egui::Frame::canvas(ui.style()).show(ui, |ui| {
+                        egui::Frame::canvas(ui.style()).show(ui, |_ui| {
                             //
                         });
                         egui::Frame::canvas(ui.style()).show(ui, |ui| {
                             ui.set_min_width(100.0);
-                            self.wav.ui_content(ui, self.cut.cursor());
+                            self.wav.ui_content(ui, &self.cut);
                         });
                     });
                 });
 
                 // the cut panel
                 egui::CentralPanel::default().show(ctx, |ui| {
-                    ui.heading("Cut");
+                    //ui.heading("Cut");
                     ui.vertical_centered(|ui| {
                         egui::Frame::canvas(ui.style()).show(ui, |ui| {
                             self.cut_settings.ui_content(ui);

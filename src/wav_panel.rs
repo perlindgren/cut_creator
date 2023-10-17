@@ -1,3 +1,4 @@
+use crate::cut_panel::Cut;
 use egui::epaint::PathShape;
 use egui::*;
 use std::fs::File;
@@ -49,7 +50,7 @@ impl Default for Wav {
 }
 
 impl Wav {
-    pub fn ui_content(&mut self, ui: &mut Ui, cursor: Pos2) -> egui::Response {
+    pub fn ui_content(&mut self, ui: &mut Ui, cut: &Cut) -> egui::Response {
         let (response, painter) = ui.allocate_painter(
             Vec2::new(ui.available_width(), ui.available_height()),
             Sense::click_and_drag(),
@@ -96,19 +97,21 @@ impl Wav {
         painter.add(PathShape::line(right, self.stroke_sample));
 
         // paint cursor line
-        painter.add(PathShape::line(
-            vec![
-                Pos2 {
-                    x: response.rect.left(),
-                    y: cursor.y,
-                },
-                Pos2 {
-                    x: response.rect.right(),
-                    y: cursor.y,
-                },
-            ],
-            self.stroke_default,
-        ));
+        if let Some(cursor) = cut.get_cursor() {
+            painter.add(PathShape::line(
+                vec![
+                    Pos2 {
+                        x: response.rect.left(),
+                        y: cursor.y,
+                    },
+                    Pos2 {
+                        x: response.rect.right(),
+                        y: cursor.y,
+                    },
+                ],
+                self.stroke_default,
+            ));
+        }
 
         response
     }
