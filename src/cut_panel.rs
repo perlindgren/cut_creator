@@ -1,3 +1,4 @@
+use crate::cut_settings::CutSettings;
 use egui::epaint::PathShape;
 use egui::*;
 use epaint::RectShape;
@@ -164,7 +165,7 @@ impl Default for Cut {
 }
 
 impl Cut {
-    pub fn ui_content(&mut self, ui: &mut Ui) -> egui::Response {
+    pub fn ui_content(&mut self, ui: &mut Ui, cut_settings: CutSettings) -> egui::Response {
         let (response, painter) = ui.allocate_painter(
             Vec2::new(ui.available_width(), ui.available_height()),
             Sense::click_and_drag(),
@@ -183,7 +184,7 @@ impl Cut {
         let bars_rect = Rect::from_min_max(
             Pos2::ZERO,
             Pos2 {
-                x: self.bars as f32,
+                x: self.bars,
                 y: 1.0,
             },
         );
@@ -465,12 +466,16 @@ impl Cut {
             for i in 0..points {
                 let t = i as f32 * step + start;
                 let y = self.spline.sample(t).unwrap();
-                let y = if y > 1.0 {
-                    y - 1.0
-                } else if y < 0.0 {
-                    y + 1.0
+                let y = if cut_settings.is_warped() {
+                    if y > 1.0 {
+                        y - 1.0
+                    } else if y < 0.0 {
+                        y + 1.0
+                    } else {
+                        y
+                    }
                 } else {
-                    y
+                    y.max(0.0).min(1.0)
                 };
 
                 v.push(bars_to_screen * Pos2 { x: t, y })

@@ -1,6 +1,6 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
 
-use cut_creator::{cut_panel::Cut, wav_panel::Wav};
+use cut_creator::{cut_panel::Cut, cut_settings::CutSettings, wav_panel::Wav};
 
 fn main() -> Result<(), eframe::Error> {
     env_logger::init(); // Log to stderr (if you run with `RUST_LOG=debug`).
@@ -18,6 +18,7 @@ fn main() -> Result<(), eframe::Error> {
 
 #[derive(Default)]
 struct App {
+    cut_settings: CutSettings,
     cut: Cut,
     wav: Wav,
 }
@@ -29,17 +30,28 @@ impl eframe::App for App {
                 // the waveform
                 egui::SidePanel::right("Right").show(ctx, |ui| {
                     ui.heading("Audio");
-                    egui::Frame::canvas(ui.style()).show(ui, |ui| {
-                        ui.set_min_width(100.0);
-                        self.wav.ui_content(ui, self.cut.cursor());
+                    ui.vertical_centered(|ui| {
+                        egui::Frame::canvas(ui.style()).show(ui, |ui| {
+                            //
+                        });
+                        egui::Frame::canvas(ui.style()).show(ui, |ui| {
+                            ui.set_min_width(100.0);
+                            self.wav.ui_content(ui, self.cut.cursor());
+                        });
                     });
                 });
-                // the splines
+
+                // the cut panel
                 egui::CentralPanel::default().show(ctx, |ui| {
                     ui.heading("Cut");
-                    egui::Frame::canvas(ui.style()).show(ui, |ui| {
-                        self.cut.ui_content(ui);
-                    })
+                    ui.vertical_centered(|ui| {
+                        egui::Frame::canvas(ui.style()).show(ui, |ui| {
+                            self.cut_settings.ui_content(ui);
+                        });
+                        egui::Frame::canvas(ui.style()).show(ui, |ui| {
+                            self.cut.ui_content(ui, self.cut_settings);
+                        })
+                    });
                 });
             });
         });

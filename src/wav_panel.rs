@@ -7,8 +7,8 @@ use wav::{BitDepth, Header};
 pub struct Wav {
     stroke_default: Stroke,
     stroke_sample: Stroke,
-    header: Header,
-    stereo: Vec<f32>,
+    _header: Header,
+    _stereo: Vec<f32>,
     left: Vec<f32>,
     right: Vec<f32>,
 }
@@ -16,10 +16,10 @@ pub struct Wav {
 impl Default for Wav {
     fn default() -> Self {
         let mut inp_file = File::open(Path::new("audio/ahh.wav")).unwrap();
-        let (header, data) = wav::read(&mut inp_file).unwrap();
-        println!("header {:?}", header);
+        let (_header, data) = wav::read(&mut inp_file).unwrap();
+        println!("header {:?}", _header);
 
-        let stereo = match data {
+        let _stereo = match data {
             BitDepth::ThirtyTwoFloat(v) => {
                 println!("len {}", v.len());
                 v
@@ -29,7 +29,7 @@ impl Default for Wav {
             }
         };
 
-        let mut v = stereo.iter();
+        let mut v = _stereo.iter();
         let mut left = vec![];
         let mut right = vec![];
         while let Some(l) = v.next() {
@@ -40,8 +40,8 @@ impl Default for Wav {
         Self {
             stroke_default: Stroke::new(1.0, Color32::WHITE),
             stroke_sample: Stroke::new(1.0, Color32::GREEN.linear_multiply(0.25)),
-            header,
-            stereo,
+            _header,
+            _stereo,
             left,
             right,
         }
