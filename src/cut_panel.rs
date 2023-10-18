@@ -84,8 +84,9 @@ pub struct Cut {
 
     /// Cursor
     cursor: Option<Pos2>,
-    // /// drag
-    // knot_drag: Option<Pos>
+
+    /// Value
+    value: Option<f32>,
 }
 
 impl Cut {
@@ -105,6 +106,11 @@ impl Cut {
     /// get the cursor position
     pub fn get_cursor(&self) -> Option<Pos2> {
         self.cursor
+    }
+
+    /// get value at cursor position
+    pub fn get_value(&self) -> Option<f32> {
+        self.value
     }
 }
 
@@ -160,6 +166,7 @@ impl Default for Cut {
             stroke_grid_1: Stroke::new(2.0, Color32::GRAY.linear_multiply(0.20)),
             spline,
             cursor: None,
+            value: None,
         }
     }
 }
@@ -453,36 +460,34 @@ impl Cut {
         }
 
         // draw spline
-        if self.knots.len() > 3 {
-            let start = self.knots[1].pos.x; // to ensure we have two knots on either side
-            let end = self.knots[self.knots.len() - 2].pos.x;
+        let start = self.knots[1].pos.x; // to ensure we have two knots on either side
+        let end = self.knots[self.knots.len() - 2].pos.x;
 
-            let interval = end - start;
-            let points: u32 = 1000;
-            let step = interval / (points as f32);
+        let interval = end - start;
+        let points: u32 = 1000;
+        let step = interval / (points as f32);
 
-            let mut v = vec![];
+        let mut v = vec![];
 
-            for i in 0..points {
-                let t = i as f32 * step + start;
-                let y = self.spline.sample(t).unwrap();
-                let y = if cut_settings.is_warped() {
-                    if y > 1.0 {
-                        y - 1.0
-                    } else if y < 0.0 {
-                        y + 1.0
-                    } else {
-                        y
-                    }
+        for i in 0..points {
+            let t = i as f32 * step + start;
+            let y = self.spline.sample(t).unwrap();
+            let y = if cut_settings.is_warped() {
+                if y > 1.0 {
+                    y - 1.0
+                } else if y < 0.0 {
+                    y + 1.0
                 } else {
-                    y.max(0.0).min(1.0)
-                };
+                    y
+                }
+            } else {
+                y.max(0.0).min(1.0)
+            };
 
-                v.push(bars_to_screen * Pos2 { x: t, y })
-            }
-
-            painter.add(PathShape::line(v, self.stroke_spline));
+            v.push(bars_to_screen * Pos2 { x: t, y })
         }
+
+        painter.add(PathShape::line(v, self.stroke_spline));
 
         // draw connecting lines for spline
         let points_in_screen: Vec<Pos2> =
@@ -498,6 +503,26 @@ impl Cut {
             .hover_pos()
         {
             self.cursor = Some(pos);
+            let t = bars_to_screen.inverse().transform_pos(pos).x;
+
+            if let Some(y) = self.spline.sample(t) {
+                let y = if cut_settings.is_warped() {
+                    if y > 1.0 {
+                        y - 1.0
+                    } else if y < 0.0 {
+                        y + 1.0
+                    } else {
+                        y
+                    }
+                } else {
+                    y.max(0.0).min(1.0)
+                };
+                self.value = Some(y);
+            } else {
+                self.value = None;
+            }
+
+            println!("cut ratio {:?}", self.value);
 
             let logic_pos = to_screen.inverse().transform_pos(pos);
             let segment_pos = logic_pos.x / scale;
@@ -518,6 +543,7 @@ impl Cut {
             ));
         } else {
             self.cursor = None;
+            self.value = None;
         }
 
         // grid

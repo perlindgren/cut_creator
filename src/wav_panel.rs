@@ -12,6 +12,8 @@ pub struct Wav {
     _stereo: Vec<f32>,
     left: Vec<f32>,
     right: Vec<f32>,
+    offset: f32,
+    len: f32,
 }
 
 impl Default for Wav {
@@ -33,6 +35,7 @@ impl Default for Wav {
         let mut v = _stereo.iter();
         let mut left = vec![];
         let mut right = vec![];
+        let len = left.len() as f32;
         while let Some(l) = v.next() {
             left.push(*l);
             right.push(*v.next().unwrap())
@@ -45,6 +48,8 @@ impl Default for Wav {
             _stereo,
             left,
             right,
+            offset: 0.0,
+            len,
         }
     }
 }
@@ -108,6 +113,25 @@ impl Wav {
                         x: response.rect.right(),
                         y: cursor.y,
                     },
+                ],
+                self.stroke_default,
+            ));
+        }
+
+        // paint value
+        if let Some(value) = cut.get_value() {
+            painter.add(PathShape::line(
+                vec![
+                    to_screen
+                        * Pos2 {
+                            x: 0.0,
+                            y: value * height,
+                        },
+                    to_screen
+                        * Pos2 {
+                            x: width,
+                            y: value * height,
+                        },
                 ],
                 self.stroke_default,
             ));
