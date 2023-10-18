@@ -12,8 +12,8 @@ pub struct Wav {
     _stereo: Vec<f32>,
     left: Vec<f32>,
     right: Vec<f32>,
-    offset: f32,
-    len: f32,
+    offset: u32, // in samples, wrapping
+    len: u32,    // in samples
 }
 
 impl Default for Wav {
@@ -24,7 +24,7 @@ impl Default for Wav {
 
         let _stereo = match data {
             BitDepth::ThirtyTwoFloat(v) => {
-                println!("len {}", v.len());
+                println!("len total{}", v.len());
                 v
             }
             _ => {
@@ -35,11 +35,12 @@ impl Default for Wav {
         let mut v = _stereo.iter();
         let mut left = vec![];
         let mut right = vec![];
-        let len = left.len() as f32;
         while let Some(l) = v.next() {
             left.push(*l);
             right.push(*v.next().unwrap())
         }
+        let len = left.len() as u32;
+        println!("len samples{}", len);
 
         Self {
             stroke_default: Stroke::new(1.0, Color32::WHITE),
@@ -48,7 +49,7 @@ impl Default for Wav {
             _stereo,
             left,
             right,
-            offset: 0.0,
+            offset: 0,
             len,
         }
     }
@@ -66,20 +67,36 @@ impl Wav {
             response.rect,
         );
 
+        if response.drag_started_by(PointerButton::Primary) {
+            let pos = response.interact_pointer_pos().unwrap();
+            println!("drag start {:?}", pos);
+        }
+
         let width = response.rect.width();
         let height = response.rect.height();
+
+        if response.dragged_by(PointerButton::Primary) {
+            let pos = response.interact_pointer_pos().unwrap();
+            println!("drag pos {:?}", pos);
+            let delta = response.drag_delta();
+            println!("delta {:?}", delta);
+            let delta_scale = (((delta.y / height) * self.len as f32) as i32) as u32;
+            println!("delta_scale {:?}", delta_scale);
+
+            self.offset = ((self.offset as i32 - delta_scale as i32) % self.len as i32) as u32;
+        }
 
         // compute left/right sample
         let mut left: Vec<Pos2> = vec![];
         let mut right: Vec<Pos2> = vec![];
-        let len = self.left.len();
+        let len = self.len;
         let step = len as f32 / height;
 
         for i in 0..height as usize {
-            let t = ((i as f32) * step) as usize;
+            let t = (self.offset + ((i as f32) * step) as u32) % self.len;
 
-            let l: f32 = self.left[t];
-            let r: f32 = self.right[t];
+            let l: f32 = self.left[t as usize];
+            let r: f32 = self.right[t as usize];
             left.push(
                 to_screen
                     * Pos2 {
