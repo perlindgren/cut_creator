@@ -12,8 +12,8 @@ pub struct Wav {
     _stereo: Vec<f32>,
     left: Vec<f32>,
     right: Vec<f32>,
-    offset: u32, // in samples, wrapping
-    len: u32,    // in samples
+    offset: usize, // in samples, wrapping
+    len: usize,    // in samples
 }
 
 impl Default for Wav {
@@ -39,7 +39,7 @@ impl Default for Wav {
             left.push(*l);
             right.push(*v.next().unwrap())
         }
-        let len = left.len() as u32;
+        let len = left.len();
         println!("len samples{}", len);
 
         Self {
@@ -80,10 +80,10 @@ impl Wav {
             println!("drag pos {:?}", pos);
             let delta = response.drag_delta();
             println!("delta {:?}", delta);
-            let delta_scale = (((delta.y / height) * self.len as f32) as i32) as u32;
+            let delta_scale = ((delta.y / height) * self.len as f32) as i32 as usize;
             println!("delta_scale {:?}", delta_scale);
 
-            self.offset = ((self.offset as i32 - delta_scale as i32) % self.len as i32) as u32;
+            self.offset = (self.offset + self.len - delta_scale) % self.len;
         }
 
         // compute left/right sample
@@ -93,10 +93,10 @@ impl Wav {
         let step = len as f32 / height;
 
         for i in 0..height as usize {
-            let t = (self.offset + ((i as f32) * step) as u32) % self.len;
+            let t = (self.offset + ((i as f32) * step) as usize) % self.len;
 
-            let l: f32 = self.left[t as usize];
-            let r: f32 = self.right[t as usize];
+            let l: f32 = self.left[t];
+            let r: f32 = self.right[t];
             left.push(
                 to_screen
                     * Pos2 {
