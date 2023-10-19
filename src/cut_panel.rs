@@ -1,4 +1,3 @@
-use crate::cut_settings::CutSettings;
 use egui::epaint::PathShape;
 use egui::*;
 use epaint::RectShape;
@@ -87,37 +86,12 @@ pub struct Cut {
 
     /// Value
     value: Option<f32>,
-}
 
-impl Cut {
-    // call to update spline when knots are changed
-    pub fn update(&mut self, cut_settings: &CutSettings) {
-        let len = self.knots.len();
-        // ensure that endpoints are aligned
-        self.knots[0].pos.y = self.knots[1].pos.y;
+    /// Looping, the end point equates the start point
+    looping: bool,
 
-        if cut_settings.is_looped() {
-            self.knots[len - 2].pos.y = self.knots[0].pos.y;
-            self.knots[len - 1].pos.y = self.knots[len - 2].pos.y;
-        } else {
-            self.knots[len - 1].pos.y = self.knots[len - 2].pos.y;
-        }
-        self.spline = Spline::from_iter(
-            self.knots
-                .iter()
-                .map(|k| Key::new(k.pos.x, k.pos.y, Interpolation::CatmullRom)),
-        );
-    }
-
-    /// get the cursor position
-    pub fn get_cursor(&self) -> Option<Pos2> {
-        self.cursor
-    }
-
-    /// get value at cursor position
-    pub fn get_value(&self) -> Option<f32> {
-        self.value
-    }
+    /// Warping, the samples will warp across start/end
+    warping: bool,
 }
 
 impl Default for Cut {
@@ -173,12 +147,56 @@ impl Default for Cut {
             spline,
             cursor: None,
             value: None,
+            looping: false,
+            warping: false,
         }
     }
 }
 
 impl Cut {
-    pub fn ui_content(&mut self, ui: &mut Ui, cut_settings: &CutSettings) -> egui::Response {
+    /// call to update spline when knots are changed
+    pub fn update(&mut self) {
+        let len = self.knots.len();
+        // ensure that endpoints are aligned
+        self.knots[0].pos.y = self.knots[1].pos.y;
+
+        if self.looping {
+            self.knots[len - 2].pos.y = self.knots[0].pos.y;
+            self.knots[len - 1].pos.y = self.knots[len - 2].pos.y;
+        } else {
+            self.knots[len - 1].pos.y = self.knots[len - 2].pos.y;
+        }
+        self.spline = Spline::from_iter(
+            self.knots
+                .iter()
+                .map(|k| Key::new(k.pos.x, k.pos.y, Interpolation::CatmullRom)),
+        );
+    }
+
+    /// get the cursor position
+    pub fn get_cursor(&self) -> Option<Pos2> {
+        self.cursor
+    }
+
+    /// get value at cursor position
+    pub fn get_value(&self) -> Option<f32> {
+        self.value
+    }
+    pub fn ui_content_settings(&mut self, ui: &mut Ui) {
+        ui.horizontal(|ui| {
+            if ui.checkbox(&mut self.looping, "looping").clicked() {
+                println!("looping {}", self.looping);
+                self.update();
+            }
+
+            if ui.checkbox(&mut self.warping, "warping").clicked() {
+                println!("warping {}", self.warping)
+            }
+        });
+    }
+
+    /// main panel
+    pub fn ui_content(&mut self, ui: &mut Ui) -> egui::Response {
         let (response, painter) = ui.allocate_painter(
             Vec2::new(ui.available_width(), ui.available_height()),
             Sense::click_and_drag(),
@@ -462,7 +480,7 @@ impl Cut {
         }
 
         if update {
-            self.update(cut_settings);
+            self.update();
         }
 
         // draw spline
@@ -478,7 +496,7 @@ impl Cut {
         for i in 0..points {
             let t = i as f32 * step + start;
             let y = self.spline.sample(t).unwrap();
-            let y = if cut_settings.is_warped() {
+            let y = if self.warping {
                 if y > 1.0 {
                     y - 1.0
                 } else if y < 0.0 {
@@ -512,7 +530,7 @@ impl Cut {
             let t = bars_to_screen.inverse().transform_pos(pos).x;
 
             if let Some(y) = self.spline.sample(t) {
-                let y = if cut_settings.is_warped() {
+                let y = if self.warping {
                     if y > 1.0 {
                         y - 1.0
                     } else if y < 0.0 {

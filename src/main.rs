@@ -1,6 +1,6 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
 
-use cut_creator::{cut_panel::Cut, cut_settings::CutSettings, wav_panel::Wav};
+use cut_creator::{cut_panel::Cut, wav_panel::Wav};
 
 fn main() -> Result<(), eframe::Error> {
     env_logger::init(); // Log to stderr (if you run with `RUST_LOG=debug`).
@@ -18,7 +18,6 @@ fn main() -> Result<(), eframe::Error> {
 
 #[derive(Default)]
 struct App {
-    cut_settings: CutSettings,
     cut: Cut,
     wav: Wav,
 }
@@ -47,10 +46,10 @@ impl eframe::App for App {
                         egui::CentralPanel::default().show(ctx, |ui| {
                             ui.vertical_centered(|ui| {
                                 egui::Frame::canvas(ui.style()).show(ui, |ui| {
-                                    self.cut_settings.ui_content(ui, &mut self.cut);
+                                    self.cut.ui_content_settings(ui);
                                 });
                                 egui::Frame::canvas(ui.style()).show(ui, |ui| {
-                                    self.cut.ui_content(ui, &self.cut_settings);
+                                    self.cut.ui_content(ui);
                                 })
                             });
                         });
