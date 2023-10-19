@@ -47,10 +47,10 @@ impl eframe::App for App {
                         egui::CentralPanel::default().show(ctx, |ui| {
                             ui.vertical_centered(|ui| {
                                 egui::Frame::canvas(ui.style()).show(ui, |ui| {
-                                    self.cut_settings.ui_content(ui);
+                                    self.cut_settings.ui_content(ui, &mut self.cut);
                                 });
                                 egui::Frame::canvas(ui.style()).show(ui, |ui| {
-                                    self.cut.ui_content(ui, self.cut_settings);
+                                    self.cut.ui_content(ui, &self.cut_settings);
                                 })
                             });
                         });

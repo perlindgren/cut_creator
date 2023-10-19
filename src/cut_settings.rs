@@ -1,3 +1,4 @@
+use crate::cut_panel::Cut;
 use egui::*;
 
 // settings
@@ -30,15 +31,11 @@ impl Default for CutSettings {
 }
 
 impl CutSettings {
-    pub fn ui_content(&mut self, ui: &mut Ui) {
-        // let (response, painter) = ui.allocate_painter(
-        //     Vec2::new(ui.available_width(), ui.available_height()),
-        //     Sense::click_and_drag(),
-        // );
-
+    pub fn ui_content(&mut self, ui: &mut Ui, cut: &mut Cut) {
         ui.horizontal(|ui| {
             if ui.checkbox(&mut self.looping, "looping").clicked() {
-                println!("looping {}", self.looping)
+                println!("looping {}", self.looping);
+                cut.update(self);
             }
 
             if ui.checkbox(&mut self.warping, "warping").clicked() {

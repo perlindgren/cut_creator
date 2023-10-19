@@ -91,11 +91,17 @@ pub struct Cut {
 
 impl Cut {
     // call to update spline when knots are changed
-    fn update(&mut self) {
+    pub fn update(&mut self, cut_settings: &CutSettings) {
         let len = self.knots.len();
         // ensure that endpoints are aligned
         self.knots[0].pos.y = self.knots[1].pos.y;
-        self.knots[len - 1].pos.y = self.knots[len - 2].pos.y;
+
+        if cut_settings.is_looped() {
+            self.knots[len - 2].pos.y = self.knots[0].pos.y;
+            self.knots[len - 1].pos.y = self.knots[len - 2].pos.y;
+        } else {
+            self.knots[len - 1].pos.y = self.knots[len - 2].pos.y;
+        }
         self.spline = Spline::from_iter(
             self.knots
                 .iter()
@@ -172,7 +178,7 @@ impl Default for Cut {
 }
 
 impl Cut {
-    pub fn ui_content(&mut self, ui: &mut Ui, cut_settings: CutSettings) -> egui::Response {
+    pub fn ui_content(&mut self, ui: &mut Ui, cut_settings: &CutSettings) -> egui::Response {
         let (response, painter) = ui.allocate_painter(
             Vec2::new(ui.available_width(), ui.available_height()),
             Sense::click_and_drag(),
@@ -456,7 +462,7 @@ impl Cut {
         }
 
         if update {
-            self.update();
+            self.update(cut_settings);
         }
 
         // draw spline
