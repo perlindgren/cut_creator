@@ -17,21 +17,21 @@ pub struct Wav {
 }
 
 impl Wav {
-    pub fn get_offset(&self) -> usize {
-        self.offset
-    }
-    pub fn set_offset(&mut self, offset: usize) {
-        self.offset = offset;
-    }
-    pub fn get_len(&self) -> usize {
-        self.len
-    }
-    pub fn set_len(&mut self, len: usize) {
-        self.len = len;
-    }
-    pub fn get_sample_len(&self) -> usize {
-        self.left.len()
-    }
+    // pub fn get_offset(&self) -> usize {
+    //     self.offset
+    // }
+    // pub fn set_offset(&mut self, offset: usize) {
+    //     self.offset = offset;
+    // }
+    // pub fn get_len(&self) -> usize {
+    //     self.len
+    // }
+    // pub fn set_len(&mut self, len: usize) {
+    //     self.len = len;
+    // }
+    // pub fn get_sample_len(&self) -> usize {
+    //     self.left.len()
+    // }
 }
 
 impl Default for Wav {
@@ -78,9 +78,9 @@ impl Wav {
     pub fn ui_content_ctrl(&mut self, ui: &mut Ui) {
         ui.horizontal(|ui| {
             if ui.button("X").clicked() {
-                self.set_offset(0);
+                self.offset = 0;
             }
-            ui.label(format!("offset {}", self.get_offset()));
+            ui.label(format!("offset {}", self.offset));
             // ui.with_layout(egui::Layout::left_to_right(egui::Align::LEFT), |ui| {
             //     ui.add_sized(
             //         [100.0, 10.0],
@@ -89,9 +89,9 @@ impl Wav {
             // });
             ui.separator();
             if ui.button("X").clicked() {
-                self.set_len(self.get_sample_len());
+                self.len = self.left.len()
             }
-            ui.label(format!("len {}", self.get_len()));
+            ui.label(format!("len {}", self.len));
         });
     }
 
@@ -110,22 +110,23 @@ impl Wav {
         let width = response.rect.width();
         let height = response.rect.height();
 
+        // length
         if response.dragged_by(PointerButton::Secondary) {
             let delta = response.drag_delta();
-            println!("delta {:?}", delta);
             let delta_scale = ((delta.y / height) * self.len as f32) as i32 as usize;
-            println!("delta_scale {:?}", delta_scale);
 
             self.len = (self.len - delta_scale).max(10_000).min(self.left.len());
+            assert!(self.len >= 10_000 && self.len <= self.left.len());
         }
 
+        // offset
         if response.dragged_by(PointerButton::Primary) {
             let delta = response.drag_delta();
-            println!("delta {:?}", delta);
-            let delta_scale = ((delta.y / height) * self.len as f32) as i32 as usize;
-            println!("delta_scale {:?}", delta_scale);
 
-            self.offset = (self.offset + self.len - delta_scale) % self.len;
+            let delta_scale = ((delta.y / height) * self.len as f32) as i32 as usize;
+
+            self.offset = (self.left.len() + self.offset - delta_scale) % self.left.len();
+            assert!(self.offset <= self.left.len());
         }
 
         // compute left/right sample
@@ -135,10 +136,9 @@ impl Wav {
         let step = self.len as f32 / height;
 
         for i in 0..height as usize {
-            let mut t = ((i as f32) * step) as usize + self.offset;
-            if t >= self.left.len() {
-                t -= self.len;
-            }
+            let t =
+                (((i as f32) * step) as usize + self.offset + self.left.len()) % self.left.len();
+            assert!(t <= self.left.len());
 
             let l: f32 = self.left[t];
             let r: f32 = self.right[t];
