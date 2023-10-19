@@ -29,24 +29,26 @@ impl eframe::App for App {
                 // egui::Frame::canvas(ui.style()).show(ui, |ui| {
                 ui.horizontal(|_ui| {
                     // the waveform
-                    egui::SidePanel::right("Right").show(ctx, |ui| {
+                    egui::SidePanel::right("right_id").show(ctx, |ui| {
+                        // control for wav
                         self.wav.ui_content_ctrl(ui);
-                        ui.vertical_centered(|ui| {
-                            egui::Frame::canvas(ui.style()).show(ui, |ui| {
-                                ui.set_min_width(100.0);
-                                self.wav.ui_content(ui, &self.cut);
-                            });
+
+                        // main wave panel
+                        egui::Frame::canvas(ui.style()).show(ui, |ui| {
+                            ui.set_min_width(100.0);
+                            self.wav.ui_content(ui, &self.cut);
                         });
                     });
 
                     // the cut panel
                     egui::CentralPanel::default().show(ctx, |ui| {
-                        ui.vertical_centered(|ui| {
-                            self.cut.ui_content_settings(ui);
-                            egui::Frame::canvas(ui.style()).show(ui, |ui| {
-                                self.cut.ui_content(ui);
-                            })
-                        });
+                        // settings
+                        self.cut.ui_content_settings(ui);
+
+                        // main cut panel
+                        egui::Frame::canvas(ui.style()).show(ui, |ui| {
+                            self.cut.ui_content(ui);
+                        })
                     });
                 });
             });
