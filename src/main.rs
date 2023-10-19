@@ -31,7 +31,7 @@ impl eframe::App for App {
                     ui.horizontal(|_ui| {
                         // the waveform
                         egui::SidePanel::right("Right").show(ctx, |ui| {
-                            ui.heading("Audio");
+                            self.wav.ui_content_ctrl(ui);
                             ui.vertical_centered(|ui| {
                                 egui::Frame::canvas(ui.style()).show(ui, |_ui| {
                                     //
@@ -45,7 +45,6 @@ impl eframe::App for App {
 
                         // the cut panel
                         egui::CentralPanel::default().show(ctx, |ui| {
-                            //ui.heading("Cut");
                             ui.vertical_centered(|ui| {
                                 egui::Frame::canvas(ui.style()).show(ui, |ui| {
                                     self.cut_settings.ui_content(ui);

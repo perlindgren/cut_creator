@@ -16,6 +16,24 @@ pub struct Wav {
     len: usize,    // in samples
 }
 
+impl Wav {
+    pub fn get_offset(&self) -> usize {
+        self.offset
+    }
+    pub fn set_offset(&mut self, offset: usize) {
+        self.offset = offset;
+    }
+    pub fn get_len(&self) -> usize {
+        self.len
+    }
+    pub fn set_len(&mut self, len: usize) {
+        self.len = len;
+    }
+    pub fn get_sample_len(&self) -> usize {
+        self.left.len()
+    }
+}
+
 impl Default for Wav {
     fn default() -> Self {
         let mut inp_file = File::open(Path::new("audio/ahh.wav")).unwrap();
