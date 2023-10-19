@@ -26,39 +26,28 @@ impl eframe::App for App {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.vertical(|ui| {
-                egui::Frame::canvas(ui.style()).show(ui, |ui| {
-                    ui.horizontal(|_ui| {
-                        // the waveform
-                        egui::SidePanel::right("Right").show(ctx, |ui| {
-                            self.wav.ui_content_ctrl(ui);
-                            ui.vertical_centered(|ui| {
-                                egui::Frame::canvas(ui.style()).show(ui, |_ui| {
-                                    //
-                                });
-                                egui::Frame::canvas(ui.style()).show(ui, |ui| {
-                                    ui.set_min_width(100.0);
-                                    self.wav.ui_content(ui, &self.cut);
-                                });
-                            });
-                        });
-
-                        // the cut panel
-                        egui::CentralPanel::default().show(ctx, |ui| {
-                            ui.vertical_centered(|ui| {
-                                egui::Frame::canvas(ui.style()).show(ui, |ui| {
-                                    self.cut.ui_content_settings(ui);
-                                });
-                                egui::Frame::canvas(ui.style()).show(ui, |ui| {
-                                    self.cut.ui_content(ui);
-                                })
+                // egui::Frame::canvas(ui.style()).show(ui, |ui| {
+                ui.horizontal(|_ui| {
+                    // the waveform
+                    egui::SidePanel::right("Right").show(ctx, |ui| {
+                        self.wav.ui_content_ctrl(ui);
+                        ui.vertical_centered(|ui| {
+                            egui::Frame::canvas(ui.style()).show(ui, |ui| {
+                                ui.set_min_width(100.0);
+                                self.wav.ui_content(ui, &self.cut);
                             });
                         });
                     });
-                });
-                ui.separator();
-                egui::Frame::canvas(ui.style()).show(ui, |ui| {
-                    //
-                    if ui.button("c1").clicked() {}
+
+                    // the cut panel
+                    egui::CentralPanel::default().show(ctx, |ui| {
+                        ui.vertical_centered(|ui| {
+                            self.cut.ui_content_settings(ui);
+                            egui::Frame::canvas(ui.style()).show(ui, |ui| {
+                                self.cut.ui_content(ui);
+                            })
+                        });
+                    });
                 });
             });
         });

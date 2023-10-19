@@ -182,6 +182,8 @@ impl Cut {
     pub fn get_value(&self) -> Option<f32> {
         self.value
     }
+
+    /// settings
     pub fn ui_content_settings(&mut self, ui: &mut Ui) {
         ui.horizontal(|ui| {
             if ui.checkbox(&mut self.looping, "looping").clicked() {

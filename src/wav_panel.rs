@@ -74,6 +74,28 @@ impl Default for Wav {
 }
 
 impl Wav {
+    /// control panel
+    pub fn ui_content_ctrl(&mut self, ui: &mut Ui) {
+        ui.horizontal(|ui| {
+            if ui.button("X").clicked() {
+                self.set_offset(0);
+            }
+            ui.label(format!("offset {}", self.get_offset()));
+            // ui.with_layout(egui::Layout::left_to_right(egui::Align::LEFT), |ui| {
+            //     ui.add_sized(
+            //         [100.0, 10.0],
+            //         egui::Label::new(format!("offset {}", self.get_offset())),
+            //     );
+            // });
+            ui.separator();
+            if ui.button("X").clicked() {
+                self.set_len(self.get_sample_len());
+            }
+            ui.label(format!("len {}", self.get_len()));
+        });
+    }
+
+    /// main panel
     pub fn ui_content(&mut self, ui: &mut Ui, cut: &Cut) -> egui::Response {
         let (response, painter) = ui.allocate_painter(
             Vec2::new(ui.available_width(), ui.available_height()),
