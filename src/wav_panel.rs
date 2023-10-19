@@ -67,17 +67,19 @@ impl Wav {
             response.rect,
         );
 
-        if response.drag_started_by(PointerButton::Primary) {
-            let pos = response.interact_pointer_pos().unwrap();
-            println!("drag start {:?}", pos);
-        }
-
         let width = response.rect.width();
         let height = response.rect.height();
 
+        if response.dragged_by(PointerButton::Secondary) {
+            let delta = response.drag_delta();
+            println!("delta {:?}", delta);
+            let delta_scale = ((delta.y / height) * self.len as f32) as i32 as usize;
+            println!("delta_scale {:?}", delta_scale);
+
+            self.len = (self.len - delta_scale).max(10_000).min(self.left.len());
+        }
+
         if response.dragged_by(PointerButton::Primary) {
-            let pos = response.interact_pointer_pos().unwrap();
-            println!("drag pos {:?}", pos);
             let delta = response.drag_delta();
             println!("delta {:?}", delta);
             let delta_scale = ((delta.y / height) * self.len as f32) as i32 as usize;
@@ -89,11 +91,14 @@ impl Wav {
         // compute left/right sample
         let mut left: Vec<Pos2> = vec![];
         let mut right: Vec<Pos2> = vec![];
-        let len = self.len;
-        let step = len as f32 / height;
+
+        let step = self.len as f32 / height;
 
         for i in 0..height as usize {
-            let t = (self.offset + ((i as f32) * step) as usize) % self.len;
+            let mut t = ((i as f32) * step) as usize + self.offset;
+            if t >= self.left.len() {
+                t -= self.len;
+            }
 
             let l: f32 = self.left[t];
             let r: f32 = self.right[t];
