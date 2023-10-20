@@ -76,23 +76,16 @@ impl Default for Wav {
 impl Wav {
     /// control panel
     pub fn ui_content_ctrl(&mut self, ui: &mut Ui) {
-        ui.horizontal(|ui| {
-            if ui.button("X").clicked() {
-                self.offset = 0;
-            }
-            ui.label(format!("offset {}", self.offset));
-            // ui.with_layout(egui::Layout::left_to_right(egui::Align::LEFT), |ui| {
-            //     ui.add_sized(
-            //         [100.0, 10.0],
-            //         egui::Label::new(format!("offset {}", self.get_offset())),
-            //     );
-            // });
-            ui.separator();
-            if ui.button("X").clicked() {
-                self.len = self.left.len()
-            }
-            ui.label(format!("len {}", self.len));
-        });
+        if ui.button("X").clicked() {
+            self.offset = 0;
+        }
+        ui.label(format!("offset {}", self.offset));
+
+        ui.spacing();
+        if ui.button("X").clicked() {
+            self.len = self.left.len()
+        }
+        ui.label(format!("len {}", self.len));
     }
 
     /// main panel

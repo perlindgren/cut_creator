@@ -1,6 +1,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
 
 use cut_creator::{cut_panel::Cut, wav_panel::Wav};
+use egui::epaint::RectShape;
 
 fn main() -> Result<(), eframe::Error> {
     env_logger::init(); // Log to stderr (if you run with `RUST_LOG=debug`).
@@ -25,32 +26,48 @@ struct App {
 impl eframe::App for App {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         egui::CentralPanel::default().show(ctx, |ui| {
-            ui.vertical(|ui| {
-                // egui::Frame::canvas(ui.style()).show(ui, |ui| {
-                ui.horizontal(|_ui| {
-                    // the waveform
-                    egui::SidePanel::right("right_id").show(ctx, |ui| {
-                        // control for wav
-                        self.wav.ui_content_ctrl(ui);
+            egui::TopBottomPanel::bottom("bottom_id")
+                .frame(egui::Frame::default().inner_margin(egui::Margin::same(8.0)))
+                .show(ctx, |ui| {
+                    ui.horizontal(|ui| {
+                        // settings
+                        self.cut.ui_content_settings(ui);
 
+                        ui.separator();
+
+                        for i in 0..12 {
+                            if ui.button(format!("{}", i)).changed() {
+                                println!("i {}", i);
+                            }
+                        }
+                        ui.separator();
+
+                        ui.with_layout(egui::Layout::right_to_left(egui::Align::RIGHT), |ui| {
+                            // control for wav
+                            self.wav.ui_content_ctrl(ui);
+                        });
+                    });
+                });
+            egui::CentralPanel::default().show(ctx, |ui| {
+                // the waveform
+                egui::SidePanel::right("right_id")
+                    .frame(egui::Frame::default().inner_margin(egui::Margin::same(5.0)))
+                    .show(ctx, |ui| {
                         // main wave panel
                         egui::Frame::canvas(ui.style()).show(ui, |ui| {
-                            ui.set_min_width(100.0);
                             self.wav.ui_content(ui, &self.cut);
                         });
                     });
 
-                    // the cut panel
-                    egui::CentralPanel::default().show(ctx, |ui| {
-                        // settings
-                        self.cut.ui_content_settings(ui);
-
+                // the cut panel
+                egui::CentralPanel::default()
+                    .frame(egui::Frame::default().inner_margin(egui::Margin::same(5.0)))
+                    .show(ctx, |ui| {
                         // main cut panel
                         egui::Frame::canvas(ui.style()).show(ui, |ui| {
                             self.cut.ui_content(ui);
-                        })
+                        });
                     });
-                });
             });
         });
     }
