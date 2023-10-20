@@ -1,7 +1,6 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
 
 use cut_creator::{cut_panel::Cut, wav_panel::Wav};
-use egui::epaint::RectShape;
 
 fn main() -> Result<(), eframe::Error> {
     env_logger::init(); // Log to stderr (if you run with `RUST_LOG=debug`).
@@ -25,7 +24,7 @@ struct App {
 
 impl eframe::App for App {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        egui::CentralPanel::default().show(ctx, |ui| {
+        egui::CentralPanel::default().show(ctx, |_ui| {
             egui::TopBottomPanel::bottom("bottom_id")
                 .frame(egui::Frame::default().inner_margin(egui::Margin::same(8.0)))
                 .show(ctx, |ui| {
@@ -48,7 +47,7 @@ impl eframe::App for App {
                         });
                     });
                 });
-            egui::CentralPanel::default().show(ctx, |ui| {
+            egui::CentralPanel::default().show(ctx, |_ui| {
                 // the waveform
                 egui::SidePanel::right("right_id")
                     .frame(egui::Frame::default().inner_margin(egui::Margin::same(5.0)))
