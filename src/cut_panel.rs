@@ -455,28 +455,37 @@ impl Cut {
         let end = self.knots[self.knots.len() - 2].pos.x;
 
         let interval = end - start;
-        let points: u32 = 1000;
-        let step = interval / (points as f32);
+        let points = width / config.step_size as f32;
+        let step = interval / points;
 
         let mut v = vec![];
 
-        for i in 0..points {
+        for i in 0..=points as usize {
             let t = i as f32 * step + start;
-            let y = self.spline.sample(t).unwrap();
-            let y = if self.warping {
-                if y > 1.0 {
-                    y - 1.0
-                } else if y < 0.0 {
-                    y + 1.0
-                } else {
-                    y
-                }
-            } else {
-                y.max(0.0).min(1.0)
-            };
 
-            v.push(bars_to_screen * Pos2 { x: t, y })
+            if let Some(y) = self.spline.sample(t) {
+                let y = if self.warping {
+                    if y > 1.0 {
+                        y - 1.0
+                    } else if y < 0.0 {
+                        y + 1.0
+                    } else {
+                        y
+                    }
+                } else {
+                    y.max(0.0).min(1.0)
+                };
+
+                v.push(bars_to_screen * Pos2 { x: t, y })
+            }
         }
+        v.push(
+            bars_to_screen
+                * Pos2 {
+                    x: end,
+                    y: self.spline.sample(end - 0.000001).unwrap(),
+                },
+        );
 
         painter.add(PathShape::line(v, config.stroke_spline));
 

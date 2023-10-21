@@ -15,6 +15,9 @@ pub struct Config {
     /// Knot lines
     pub knot_line: bool,
 
+    /// Stepsize
+    pub step_size: u32,
+
     /// Stroke for auxiliary lines
     pub stroke_line: Stroke,
 
@@ -35,6 +38,7 @@ impl Default for Config {
             stroke_knot: Stroke::new(1.0, Color32::WHITE.linear_multiply(0.25)),
             stroke_knot_selected: Stroke::new(1.0, Color32::WHITE),
             knot_line: true,
+            step_size: 10,
             stroke_line: Stroke::new(1.0, Color32::RED.linear_multiply(0.25)),
             grid_color: Color32::GRAY,
             stroke_spline: Stroke::new(1.0, Color32::BLUE.linear_multiply(1.0)),

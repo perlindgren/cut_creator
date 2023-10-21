@@ -24,6 +24,7 @@ fn main() -> Result<(), eframe::Error> {
 
 #[derive(Default)]
 struct App {
+    /// we have 10 save slots
     cuts: [Option<(Cut, Wav, WavData)>; 10],
     /// index of selected cut
     cur_cut: usize,
@@ -61,6 +62,15 @@ impl eframe::App for App {
                         }
                     }
                     ui.separator();
+
+                    ui.checkbox(&mut self.config.knot_line, "knot lines");
+
+                    let mut text = format!("{}", self.config.step_size);
+                    ui.horizontal(|ui| {
+                        ui.label("Step Size");
+                        ui.add(egui::TextEdit::singleline(&mut text));
+                    });
+                    self.config.step_size = text.parse().unwrap_or(self.config.step_size);
 
                     if let Some((cut, wav, wav_data)) = &mut self.cuts[self.cur_cut] {
                         wav.ui_content_ctrl(ui, wav_data);
