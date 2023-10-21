@@ -36,12 +36,43 @@ struct App {
     config: Config,
 }
 
+// helper
+fn clear_cuts(enabled: &mut [bool; 10], i: usize) {
+    for (index, enable) in enabled.iter_mut().enumerate() {
+        if index != i {
+            *enable = false
+        };
+    }
+}
+
+fn load(opt_cut: &mut Option<(Cut, Wav, WavData)>) {
+    if let Some(path) = rfd::FileDialog::new()
+        .add_filter("wav", &["wav"])
+        .set_directory("./audio/")
+        .pick_file()
+    {
+        println!("path {:?}", path);
+        let (w, wd) = Wav::load(path);
+        *opt_cut = Some((Cut::default(), w, wd));
+    }
+}
+
 impl eframe::App for App {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         egui::CentralPanel::default().show(ctx, |_ui| {
             // left side panel
             egui::SidePanel::left("left_id").show(ctx, |ui| {
                 ui.vertical(|ui| {
+                    // clear all selected
+                    if ui.button("Clear all selected cuts").clicked() {
+                        clear_cuts(&mut self.enabled, 10);
+                    }
+
+                    // enabling
+                    // on first click load cut
+                    // consecutive click to select cut as active
+                    // shift click to multi select cuts
+                    // double click allows to load new sample
                     for (i, opt_cut) in self.cuts.iter_mut().enumerate() {
                         // let path = opt_cut.map_or("...".to_string(), |(_, p)| p.get_path());
                         let path: &str = if let Some((_c, _w, wd)) = opt_cut {
@@ -50,23 +81,82 @@ impl eframe::App for App {
                             "..."
                         };
 
+                        // each cut has a corresponding button
                         let button =
-                            ui.toggle_value(&mut self.enabled[i], format!("{} {}", i, path,));
-                        if button.clicked() {
+                            ui.selectable_label(self.enabled[i], format!("#{}: {}", i, path,));
+
+                        // check hover
+                        if button.interact(Sense::hover()).hovered() {
                             self.cur_cut = i;
-                            if opt_cut.is_none() || button.double_clicked() {
-                                if let Some(path) = rfd::FileDialog::new()
-                                    .add_filter("wav", &["wav"])
-                                    .set_directory("./audio/")
-                                    .pick_file()
-                                {
-                                    println!("path {:?}", path);
-                                    let (w, wd) = Wav::load(path);
-                                    *opt_cut = Some((Cut::default(), w, wd));
-                                }
-                            }
                         }
+
+                        if button.clicked() {
+                            self.enabled[i] ^= true;
+                        }
+
+                        ui.input(|is| {
+                            if is.key_pressed(Key::Enter) && i == self.cur_cut {
+                                self.enabled[i] ^= true;
+                            }
+                        });
+
+                        // load cut
+                        if button.double_clicked() || (self.enabled[i] && opt_cut.is_none()) {
+                            load(opt_cut);
+                        }
+                        //     );
+                        // let mut enter = false;
+                        // ui.input(|is| {
+                        //     if is.key_pressed(Key::Enter)
+                        //         && button.interact(Sense::hover()).hovered()
+                        //     {
+                        //         self.enabled[i] ^= true;
+                        //         enter = true;
+                        //         println!("toggle i {}", i);
+                        //     }
+                        // });
+                        // ui.input(|is| {
+
+                        // if enter || button.clicked() {
+                        //     if ui.input(|is| is.modifiers) != Modifiers::SHIFT {
+                        //         clear_cuts(&mut self.enabled, i)
+                        //     }
+
+                        //     self.cur_cut = i;
+
+                        //     if opt_cut.is_none() || button.double_clicked() {
+                        //         load(opt_cut);
+                        //     }
+                        //     // assert!(opt_cut.is_some());
+                        // }
+
+                        // });
+
+                        if self.cur_cut == i {
+                            button.highlight();
+                        };
                     }
+
+                    ui.input(|i| {
+                        if i.key_pressed(Key::ArrowDown) {
+                            self.cur_cut = (self.cur_cut + 1) % 10;
+                        }
+
+                        if i.key_pressed(Key::ArrowUp) {
+                            self.cur_cut = (10 + self.cur_cut - 1) % 10;
+                        }
+
+                        use Key::*;
+                        let dig = [Num0, Num1, Num2, Num3, Num4, Num5, Num6, Num7, Num8, Num9];
+
+                        dig.iter().enumerate().for_each(|(num, key)| {
+                            if i.key_pressed(*key) {
+                                self.cur_cut = num;
+                                self.enabled[num] = true;
+                            }
+                        })
+                    });
+
                     ui.separator();
 
                     ui.checkbox(&mut self.config.knot_line, "knot lines");
@@ -94,6 +184,29 @@ impl eframe::App for App {
                     .iter()
                     .fold(0, |acc, b| acc + if *b { 1 } else { 0 });
 
+                // dummy top
+                egui::TopBottomPanel::top("top")
+                    .frame(
+                        Frame::default()
+                            .outer_margin(egui::Margin::same(0.0))
+                            .inner_margin(egui::Margin::same(0.0)),
+                    )
+                    .show(ctx, |ui| {
+                        ui.label("dummy top panel, let's see what to do with that");
+                    });
+
+                // dummy bottom
+                egui::TopBottomPanel::bottom("bottom")
+                    .frame(
+                        Frame::default()
+                            .outer_margin(egui::Margin::same(0.0))
+                            .inner_margin(egui::Margin::same(0.0)),
+                    )
+                    .show(ctx, |ui| {
+                        ui.label("dummy bottom panel, let's see what to do with that");
+                    });
+
+                // populate center panel only if some cuts are enabled
                 if nr_enabled > 0 {
                     let height = ui.available_height();
                     let _width = ui.available_width();
@@ -102,28 +215,6 @@ impl eframe::App for App {
                         "nr enabled {} height {}, cut_height {}",
                         nr_enabled, height, cut_height
                     );
-
-                    // dummy top
-                    egui::TopBottomPanel::top("top")
-                        .frame(
-                            Frame::default()
-                                .outer_margin(egui::Margin::same(0.0))
-                                .inner_margin(egui::Margin::same(0.0)),
-                        )
-                        .show(ctx, |ui| {
-                            ui.label("dummy top panel, let's see what to do with that");
-                        });
-
-                    // dummy bottom
-                    egui::TopBottomPanel::bottom("bottom")
-                        .frame(
-                            Frame::default()
-                                .outer_margin(egui::Margin::same(0.0))
-                                .inner_margin(egui::Margin::same(0.0)),
-                        )
-                        .show(ctx, |ui| {
-                            ui.label("dummy bottom panel, let's see what to do with that");
-                        });
 
                     // right side panel with wav
                     egui::SidePanel::right("right")
