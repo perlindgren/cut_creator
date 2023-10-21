@@ -8,6 +8,7 @@ use wav::{BitDepth, Header};
 pub struct Wav {
     stroke_default: Stroke,
     stroke_sample: Stroke,
+    path: String,
     _header: Header,
     _stereo: Vec<f32>,
     left: Vec<f32>,
@@ -16,27 +17,10 @@ pub struct Wav {
     len: usize,    // in samples
 }
 
-impl Wav {
-    // pub fn get_offset(&self) -> usize {
-    //     self.offset
-    // }
-    // pub fn set_offset(&mut self, offset: usize) {
-    //     self.offset = offset;
-    // }
-    // pub fn get_len(&self) -> usize {
-    //     self.len
-    // }
-    // pub fn set_len(&mut self, len: usize) {
-    //     self.len = len;
-    // }
-    // pub fn get_sample_len(&self) -> usize {
-    //     self.left.len()
-    // }
-}
-
 impl Default for Wav {
     fn default() -> Self {
-        let mut inp_file = File::open(Path::new("audio/ahh.wav")).unwrap();
+        let path = "audio/ahh.wav".to_string();
+        let mut inp_file = File::open(Path::new(&path)).unwrap();
         let (_header, data) = wav::read(&mut inp_file).unwrap();
         println!("header {:?}", _header);
 
@@ -61,6 +45,7 @@ impl Default for Wav {
         println!("len samples{}", len);
 
         Self {
+            path,
             stroke_default: Stroke::new(1.0, Color32::WHITE),
             stroke_sample: Stroke::new(1.0, Color32::GREEN.linear_multiply(0.25)),
             _header,
@@ -74,6 +59,16 @@ impl Default for Wav {
 }
 
 impl Wav {
+    /// load
+    pub fn load(path: &str) -> Self {
+        Wav::default()
+    }
+
+    /// get path
+    pub fn get_path(&self) -> String {
+        self.path.clone()
+    }
+
     /// control panel
     pub fn ui_content_ctrl(&mut self, ui: &mut Ui) {
         if ui.button("X").clicked() {
