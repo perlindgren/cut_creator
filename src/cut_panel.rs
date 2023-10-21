@@ -1,3 +1,4 @@
+use crate::config::Config;
 use egui::epaint::PathShape;
 use egui::*;
 use epaint::RectShape;
@@ -20,12 +21,6 @@ pub struct Knot {
     selected: bool,
 }
 
-// impl Knot {
-//     fn knot_round(&self, trans: RectTransform) -> Knot {
-//         unimplemented!()
-//     }
-// }
-
 pub struct Cut {
     /// Quantization 4 -> 1/4 = 0.25 (quarter notes), 16-> 1/16 (six teens), etc.
     quantization: u32,
@@ -35,12 +30,6 @@ pub struct Cut {
 
     /// The control points.
     knots: Vec<Knot>,
-
-    /// Stroke selected.
-    stroke_default: Stroke,
-
-    /// Stroke selected.
-    stroke_selected: Stroke,
 
     /// Select rect
     select_start: Pos2,
@@ -62,21 +51,6 @@ pub struct Cut {
 
     /// Start positions for each knot
     move_knots: Vec<Pos2>,
-
-    /// Stroke for auxiliary lines.
-    stroke_line: Stroke,
-
-    /// Stroke for splines.
-    stroke_spline: Stroke,
-
-    /// Stroke grid
-    stroke_grid_16: Stroke,
-
-    /// Stroke grid
-    stroke_grid_4: Stroke,
-
-    /// Stroke grid
-    stroke_grid_1: Stroke,
 
     /// Spline
     spline: Spline<f32, f32>,
@@ -130,8 +104,6 @@ impl Default for Cut {
             quantization: 16,
             bars: 2.0,
             knots,
-            stroke_default: Stroke::new(1.0, Color32::WHITE.linear_multiply(0.25)),
-            stroke_selected: Stroke::new(1.0, Color32::WHITE),
             select_start: Pos2::ZERO,
             select_end: Pos2::ZERO,
             select_drag: false,
@@ -139,11 +111,6 @@ impl Default for Cut {
             move_start: Pos2::ZERO,
             move_last: Pos2::ZERO,
             move_knots: vec![],
-            stroke_line: Stroke::new(1.0, Color32::RED.linear_multiply(0.25)),
-            stroke_spline: Stroke::new(1.0, Color32::BLUE.linear_multiply(1.0)),
-            stroke_grid_16: Stroke::new(1.0, Color32::GRAY.linear_multiply(0.01)),
-            stroke_grid_4: Stroke::new(2.0, Color32::GRAY.linear_multiply(0.10)),
-            stroke_grid_1: Stroke::new(2.0, Color32::GRAY.linear_multiply(0.20)),
             spline,
             cursor: None,
             value: None,
@@ -198,7 +165,7 @@ impl Cut {
     }
 
     /// main panel
-    pub fn ui_content(&mut self, ui: &mut Ui) -> egui::Response {
+    pub fn ui_content(&mut self, ui: &mut Ui, config: &Config) -> egui::Response {
         let (response, painter) = ui.allocate_painter(
             Vec2::new(ui.available_width(), ui.available_height()),
             Sense::click_and_drag(),
@@ -291,7 +258,7 @@ impl Cut {
             painter.add(Shape::Rect(RectShape::stroke(
                 Rect::from_two_pos(self.select_start, self.select_end),
                 Rounding::default(),
-                self.stroke_default,
+                config.stroke_select,
             )));
         }
 
@@ -430,9 +397,9 @@ impl Cut {
                     point_in_screen,
                     control_point_radius,
                     if k.selected {
-                        self.stroke_selected
+                        config.stroke_knot_selected
                     } else {
-                        self.stroke_default
+                        config.stroke_knot
                     },
                 )
             })
@@ -513,12 +480,14 @@ impl Cut {
             v.push(bars_to_screen * Pos2 { x: t, y })
         }
 
-        painter.add(PathShape::line(v, self.stroke_spline));
+        painter.add(PathShape::line(v, config.stroke_spline));
 
         // draw connecting lines for spline
-        let points_in_screen: Vec<Pos2> =
-            self.knots.iter().map(|k| bars_to_screen * k.pos).collect();
-        painter.add(PathShape::line(points_in_screen, self.stroke_line));
+        if config.knot_line {
+            let points_in_screen: Vec<Pos2> =
+                self.knots.iter().map(|k| bars_to_screen * k.pos).collect();
+            painter.add(PathShape::line(points_in_screen, config.stroke_line));
+        }
 
         // knots
         painter.extend(control_point_shapes);
@@ -565,7 +534,7 @@ impl Cut {
                             y: response.rect.height(),
                         },
                 ],
-                self.stroke_default,
+                config.stroke_line,
             ));
         } else {
             self.cursor = None;
@@ -573,6 +542,9 @@ impl Cut {
         }
 
         // grid
+        let stroke_grid_16 = Stroke::new(1.0, Color32::GRAY.linear_multiply(0.01));
+        let stroke_grid_4 = Stroke::new(2.0, Color32::GRAY.linear_multiply(0.10));
+        let stroke_grid_1 = Stroke::new(2.0, Color32::GRAY.linear_multiply(0.20));
         for t in 0..segments as usize {
             painter.add(PathShape::line(
                 vec![
@@ -588,11 +560,11 @@ impl Cut {
                         },
                 ],
                 if t % (16) == 0 {
-                    self.stroke_grid_1
+                    stroke_grid_1
                 } else if t % 4 == 0 {
-                    self.stroke_grid_4
+                    stroke_grid_4
                 } else {
-                    self.stroke_grid_16
+                    stroke_grid_16
                 },
             ));
         }

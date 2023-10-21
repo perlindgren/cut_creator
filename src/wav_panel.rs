@@ -1,26 +1,33 @@
-use crate::cut_panel::Cut;
+use crate::{config::Config, cut_panel::Cut};
 use egui::epaint::PathShape;
 use egui::*;
-use std::fs::File;
-use std::path::Path;
+use serde::{Deserialize, Serialize};
+
+use std::{fs::File, path::PathBuf};
 use wav::{BitDepth, Header};
 
-pub struct Wav {
-    stroke_default: Stroke,
-    stroke_sample: Stroke,
-    path: String,
+pub struct WavData {
     _header: Header,
     _stereo: Vec<f32>,
     left: Vec<f32>,
     right: Vec<f32>,
+    /// the max length
+    len: usize,
+    /// filename
+    pub filename: String,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct Wav {
+    path: PathBuf,
     offset: usize, // in samples, wrapping
     len: usize,    // in samples
 }
 
-impl Default for Wav {
-    fn default() -> Self {
-        let path = "audio/ahh.wav".to_string();
-        let mut inp_file = File::open(Path::new(&path)).unwrap();
+impl Wav {
+    /// load
+    pub fn load(path: PathBuf) -> (Self, WavData) {
+        let mut inp_file = File::open(&path).unwrap();
         let (_header, data) = wav::read(&mut inp_file).unwrap();
         println!("header {:?}", _header);
 
@@ -43,34 +50,32 @@ impl Default for Wav {
         }
         let len = left.len();
         println!("len samples{}", len);
+        let filename = path.file_stem().unwrap().to_str().unwrap().to_owned();
 
-        Self {
-            path,
-            stroke_default: Stroke::new(1.0, Color32::WHITE),
-            stroke_sample: Stroke::new(1.0, Color32::GREEN.linear_multiply(0.25)),
-            _header,
-            _stereo,
-            left,
-            right,
-            offset: 0,
-            len,
-        }
-    }
-}
-
-impl Wav {
-    /// load
-    pub fn load(path: &str) -> Self {
-        Wav::default()
+        (
+            Wav {
+                path,
+                offset: 0,
+                len,
+            },
+            WavData {
+                _header,
+                _stereo,
+                left,
+                right,
+                len,
+                filename,
+            },
+        )
     }
 
     /// get path
-    pub fn get_path(&self) -> String {
-        self.path.clone()
+    pub fn get_path(&self) -> &PathBuf {
+        &self.path
     }
 
     /// control panel
-    pub fn ui_content_ctrl(&mut self, ui: &mut Ui) {
+    pub fn ui_content_ctrl(&mut self, ui: &mut Ui, wav_data: &WavData) {
         if ui.button("X").clicked() {
             self.offset = 0;
         }
@@ -78,13 +83,19 @@ impl Wav {
 
         ui.spacing();
         if ui.button("X").clicked() {
-            self.len = self.left.len()
+            self.len = wav_data.left.len()
         }
         ui.label(format!("len {}", self.len));
     }
 
     /// main panel
-    pub fn ui_content(&mut self, ui: &mut Ui, cut: &Cut) -> egui::Response {
+    pub fn ui_content(
+        &mut self,
+        ui: &mut Ui,
+        cut: &Cut,
+        wav_data: &WavData,
+        config: &Config,
+    ) -> egui::Response {
         let (response, painter) = ui.allocate_painter(
             Vec2::new(ui.available_width(), ui.available_height()),
             Sense::click_and_drag(),
@@ -103,8 +114,10 @@ impl Wav {
             let delta = response.drag_delta();
             let delta_scale = ((delta.y / height) * self.len as f32) as i32 as usize;
 
-            self.len = (self.len - delta_scale).max(10_000).min(self.left.len());
-            assert!(self.len >= 10_000 && self.len <= self.left.len());
+            self.len = (self.len - delta_scale)
+                .max(10_000)
+                .min(wav_data.left.len());
+            assert!(self.len >= 10_000 && self.len <= wav_data.left.len());
         }
 
         // offset
@@ -113,8 +126,8 @@ impl Wav {
 
             let delta_scale = ((delta.y / height) * self.len as f32) as i32 as usize;
 
-            self.offset = (self.left.len() + self.offset - delta_scale) % self.left.len();
-            assert!(self.offset <= self.left.len());
+            self.offset = (wav_data.left.len() + self.offset - delta_scale) % wav_data.left.len();
+            assert!(self.offset <= wav_data.left.len());
         }
 
         // compute left/right sample
@@ -124,12 +137,12 @@ impl Wav {
         let step = self.len as f32 / height;
 
         for i in 0..height as usize {
-            let t =
-                (((i as f32) * step) as usize + self.offset + self.left.len()) % self.left.len();
-            assert!(t <= self.left.len());
+            let t = (((i as f32) * step) as usize + self.offset + wav_data.left.len())
+                % wav_data.left.len();
+            assert!(t <= wav_data.left.len());
 
-            let l: f32 = self.left[t];
-            let r: f32 = self.right[t];
+            let l: f32 = wav_data.left[t];
+            let r: f32 = wav_data.right[t];
             left.push(
                 to_screen
                     * Pos2 {
@@ -147,9 +160,9 @@ impl Wav {
         }
 
         // paint left sample
-        painter.add(PathShape::line(left, self.stroke_sample));
+        painter.add(PathShape::line(left, config.stroke_sample));
         // paint right sample
-        painter.add(PathShape::line(right, self.stroke_sample));
+        painter.add(PathShape::line(right, config.stroke_sample));
 
         // paint cursor line
         if let Some(cursor) = cut.get_cursor() {
@@ -164,7 +177,7 @@ impl Wav {
                         y: cursor.y,
                     },
                 ],
-                self.stroke_default,
+                config.stroke_line,
             ));
         }
 
@@ -183,7 +196,7 @@ impl Wav {
                             y: value * height,
                         },
                 ],
-                self.stroke_default,
+                config.stroke_spline,
             ));
         }
 

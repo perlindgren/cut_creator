@@ -1,8 +1,13 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
 
-use cut_creator::{cut_panel::Cut, wav_panel::Wav};
-use std::fmt::Display;
-use std::path::PathBuf;
+use cut_creator::{
+    config::Config,
+    cut_panel::Cut,
+    wav_panel::{Wav, WavData},
+};
+
+// use std::fmt::Display;
+// use std::path::Path;
 fn main() -> Result<(), eframe::Error> {
     env_logger::init(); // Log to stderr (if you run with `RUST_LOG=debug`).
 
@@ -19,9 +24,11 @@ fn main() -> Result<(), eframe::Error> {
 
 #[derive(Default)]
 struct App {
-    cuts: [Option<(Cut, Wav)>; 10],
+    cuts: [Option<(Cut, Wav, WavData)>; 10],
     /// index of selected cut
     cur_cut: usize,
+    /// config
+    config: Config,
 }
 
 impl eframe::App for App {
@@ -31,10 +38,10 @@ impl eframe::App for App {
                 ui.vertical(|ui| {
                     for (i, opt_cut) in self.cuts.iter_mut().enumerate() {
                         // let path = opt_cut.map_or("...".to_string(), |(_, p)| p.get_path());
-                        let path = if let Some((_c, w)) = opt_cut {
-                            w.get_path()
+                        let path: &str = if let Some((_c, _w, wd)) = opt_cut {
+                            &wd.filename
                         } else {
-                            "...".to_string()
+                            "..."
                         };
 
                         let button = ui.button(format!("{} {}", i, path,));
@@ -47,17 +54,17 @@ impl eframe::App for App {
                                 .set_directory("./audio/")
                                 .pick_file()
                             {
-                                let s: &str = &format!("{:?}", path);
-                                println!("path {:?}", s);
-                                *opt_cut = Some((Cut::default(), Wav::load(s)));
+                                println!("path {:?}", path);
+                                let (w, wd) = Wav::load(path);
+                                *opt_cut = Some((Cut::default(), w, wd));
                             }
                         }
                     }
                     ui.separator();
                     // egui::Frame::canvas(ui.style()).show(ui, |ui| {
-                    if let Some((cut, wav)) = &mut self.cuts[self.cur_cut] {
+                    if let Some((cut, wav, wav_data)) = &mut self.cuts[self.cur_cut] {
                         // ui.horizontal(|ui| {
-                        wav.ui_content_ctrl(ui);
+                        wav.ui_content_ctrl(ui, wav_data);
                         // });
                         // ui.horizontal(|ui| {
                         cut.ui_content_settings(ui);
@@ -75,8 +82,8 @@ impl eframe::App for App {
                     .show(ctx, |ui| {
                         // main wave panel
                         egui::Frame::canvas(ui.style()).show(ui, |ui| {
-                            if let Some((cut, wav)) = opt_cut {
-                                wav.ui_content(ui, &cut);
+                            if let Some((cut, wav, wav_data)) = opt_cut {
+                                wav.ui_content(ui, cut, wav_data, &self.config);
                             }
                         });
                     });
@@ -87,8 +94,8 @@ impl eframe::App for App {
                     .show(ctx, |ui| {
                         // main cut panel
                         egui::Frame::canvas(ui.style()).show(ui, |ui| {
-                            if let Some((cut, wav)) = opt_cut {
-                                cut.ui_content(ui);
+                            if let Some((cut, _wav, _wav_data)) = opt_cut {
+                                cut.ui_content(ui, &self.config);
                             }
                         });
                     });
