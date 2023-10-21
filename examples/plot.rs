@@ -2,8 +2,7 @@
 
 use eframe::egui;
 use egui::Stroke;
-use egui_plot::{Legend, Line, Plot, PlotPoints};
-use std::f64::consts::PI;
+use egui_plot::{Line, Plot, PlotPoints};
 
 use egui::*;
 fn main() -> Result<(), eframe::Error> {
@@ -37,7 +36,7 @@ impl Default for MyApp {
 }
 
 impl eframe::App for MyApp {
-    fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
+    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         egui::CentralPanel::default().show(ctx, |ui| {
             let height = 200.0;
             let width = 300.0;
@@ -88,7 +87,7 @@ impl eframe::App for MyApp {
                         response.rect,
                     );
 
-                    let control_point_shapes: Vec<Shape> = self
+                    let _control_point_shapes: Vec<Shape> = self
                         .knots
                         .iter_mut()
                         .enumerate()
@@ -99,8 +98,8 @@ impl eframe::App for MyApp {
                                 x: point[0] as f32,
                                 y: point[1] as f32,
                             });
-                            let point_rect = Rect::from_center_size(point_in_screen, size);
-                            let point_id = response.id.with(i);
+                            let _point_rect = Rect::from_center_size(point_in_screen, size);
+                            let _point_id = response.id.with(i);
                             // let point_response = ui.interact(point_rect, point_id, Sense::drag());
 
                             //         // *point += point_response.drag_delta();

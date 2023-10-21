@@ -83,7 +83,7 @@ impl Wav {
 
         ui.spacing();
         if ui.button("X").clicked() {
-            self.len = wav_data.left.len()
+            self.len = wav_data.len
         }
         ui.label(format!("len {}", self.len));
     }
@@ -114,10 +114,8 @@ impl Wav {
             let delta = response.drag_delta();
             let delta_scale = ((delta.y / height) * self.len as f32) as i32 as usize;
 
-            self.len = (self.len - delta_scale)
-                .max(10_000)
-                .min(wav_data.left.len());
-            assert!(self.len >= 10_000 && self.len <= wav_data.left.len());
+            self.len = (self.len - delta_scale).max(10_000).min(wav_data.len);
+            assert!(self.len >= 10_000 && self.len <= wav_data.len);
         }
 
         // offset
@@ -126,8 +124,8 @@ impl Wav {
 
             let delta_scale = ((delta.y / height) * self.len as f32) as i32 as usize;
 
-            self.offset = (wav_data.left.len() + self.offset - delta_scale) % wav_data.left.len();
-            assert!(self.offset <= wav_data.left.len());
+            self.offset = (wav_data.len + self.offset - delta_scale) % wav_data.len;
+            assert!(self.offset <= wav_data.len);
         }
 
         // compute left/right sample
@@ -137,9 +135,9 @@ impl Wav {
         let step = self.len as f32 / height;
 
         for i in 0..height as usize {
-            let t = (((i as f32) * step) as usize + self.offset + wav_data.left.len())
-                % wav_data.left.len();
-            assert!(t <= wav_data.left.len());
+            let t =
+                (((i as f32) * step) as usize + self.offset + wav_data.len) % wav_data.left.len();
+            assert!(t <= wav_data.len);
 
             let l: f32 = wav_data.left[t];
             let r: f32 = wav_data.right[t];
