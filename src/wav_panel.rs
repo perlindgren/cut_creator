@@ -76,16 +76,22 @@ impl Wav {
 
     /// control panel
     pub fn ui_content_ctrl(&mut self, ui: &mut Ui, wav_data: &WavData) {
-        if ui.button("X").clicked() {
-            self.offset = 0;
-        }
-        ui.label(format!("offset {}", self.offset));
+        ui.label(&wav_data.filename);
+        ui.label(format!("{}", self.path.display()));
 
-        ui.spacing();
-        if ui.button("X").clicked() {
-            self.len = wav_data.len
-        }
-        ui.label(format!("len {}", self.len));
+        ui.horizontal(|ui| {
+            if ui.button("X").clicked() {
+                self.offset = 0;
+            }
+            ui.label(format!("offset {}", self.offset));
+        });
+
+        ui.horizontal(|ui| {
+            if ui.button("X").clicked() {
+                self.len = wav_data.len
+            }
+            ui.label(format!("len {}", self.len));
+        });
     }
 
     /// main panel

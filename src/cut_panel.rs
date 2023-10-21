@@ -152,16 +152,14 @@ impl Cut {
 
     /// settings
     pub fn ui_content_settings(&mut self, ui: &mut Ui) {
-        ui.horizontal(|ui| {
-            if ui.checkbox(&mut self.looping, "looping").clicked() {
-                println!("looping {}", self.looping);
-                self.update();
-            }
+        if ui.checkbox(&mut self.looping, "looping").clicked() {
+            println!("looping {}", self.looping);
+            self.update();
+        }
 
-            if ui.checkbox(&mut self.warping, "warping").clicked() {
-                println!("warping {}", self.warping)
-            }
-        });
+        if ui.checkbox(&mut self.warping, "warping").clicked() {
+            println!("warping {}", self.warping)
+        }
     }
 
     /// main panel

@@ -115,7 +115,7 @@ impl Splines {
                 .knots
                 .clone()
                 .into_iter()
-                .zip(self.knots_selected.clone().into_iter());
+                .zip(self.knots_selected.clone());
 
             (self.knots, self.knots_selected) = cp.filter(|(_, selected)| !*selected).unzip();
 
@@ -199,7 +199,7 @@ impl Splines {
                 .knots
                 .clone()
                 .into_iter()
-                .zip(self.knots_selected.clone().into_iter());
+                .zip(self.knots_selected.clone());
 
             let (head, mut tail): (Vec<_>, Vec<_>) = cp.partition(|(p2, _)| pos.x < p2.x);
 

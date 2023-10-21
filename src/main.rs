@@ -61,16 +61,12 @@ impl eframe::App for App {
                         }
                     }
                     ui.separator();
-                    // egui::Frame::canvas(ui.style()).show(ui, |ui| {
+
                     if let Some((cut, wav, wav_data)) = &mut self.cuts[self.cur_cut] {
-                        // ui.horizontal(|ui| {
                         wav.ui_content_ctrl(ui, wav_data);
-                        // });
-                        // ui.horizontal(|ui| {
+
                         cut.ui_content_settings(ui);
-                        // });
                     }
-                    // });
                 });
             });
             egui::CentralPanel::default().show(ctx, |_ui| {
