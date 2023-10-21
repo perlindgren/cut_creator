@@ -135,8 +135,7 @@ impl Wav {
         let step = self.len as f32 / height;
 
         for i in 0..height as usize {
-            let t =
-                (((i as f32) * step) as usize + self.offset + wav_data.len) % wav_data.left.len();
+            let t = (((i as f32) * step) as usize + self.offset + wav_data.len) % wav_data.len;
             assert!(t <= wav_data.len);
 
             let l: f32 = wav_data.left[t];
