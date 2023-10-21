@@ -6,6 +6,8 @@ use cut_creator::{
     wav_panel::{Wav, WavData},
 };
 
+use egui::*;
+
 // use std::fmt::Display;
 // use std::path::Path;
 fn main() -> Result<(), eframe::Error> {
@@ -37,6 +39,7 @@ struct App {
 impl eframe::App for App {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         egui::CentralPanel::default().show(ctx, |_ui| {
+            // left side panel
             egui::SidePanel::left("left_id").show(ctx, |ui| {
                 ui.vertical(|ui| {
                     for (i, opt_cut) in self.cuts.iter_mut().enumerate() {
@@ -82,33 +85,152 @@ impl eframe::App for App {
                     }
                 });
             });
-            egui::CentralPanel::default().show(ctx, |_ui| {
-                let opt_cut = self.cuts.get_mut(self.cur_cut).unwrap();
 
-                // the waveform
-                egui::SidePanel::right("right_id")
-                    .frame(egui::Frame::default().inner_margin(egui::Margin::same(5.0)))
-                    .show(ctx, |ui| {
-                        // main wave panel
-                        egui::Frame::canvas(ui.style()).show(ui, |ui| {
-                            if let Some((cut, wav, wav_data)) = opt_cut {
-                                wav.ui_content(ui, cut, wav_data, &self.config);
+            // center panel
+            egui::CentralPanel::default().show(ctx, |ui| {
+                // count number of enabled cuts
+                let nr_enabled = self
+                    .enabled
+                    .iter()
+                    .fold(0, |acc, b| acc + if *b { 1 } else { 0 });
+
+                if nr_enabled > 0 {
+                    let height = ui.available_height();
+                    let _width = ui.available_width();
+                    let cut_height = (height - 20.0 - nr_enabled as f32 * 10.0) / nr_enabled as f32;
+                    println!(
+                        "nr enabled {} height {}, cut_height {}",
+                        nr_enabled, height, cut_height
+                    );
+
+                    // dummy top
+                    egui::TopBottomPanel::top("top")
+                        .frame(
+                            Frame::default()
+                                .outer_margin(egui::Margin::same(0.0))
+                                .inner_margin(egui::Margin::same(0.0)),
+                        )
+                        .show(ctx, |ui| {
+                            ui.label("dummy top panel, let's see what to do with that");
+                        });
+
+                    // dummy bottom
+                    egui::TopBottomPanel::bottom("bottom")
+                        .frame(
+                            Frame::default()
+                                .outer_margin(egui::Margin::same(0.0))
+                                .inner_margin(egui::Margin::same(0.0)),
+                        )
+                        .show(ctx, |ui| {
+                            ui.label("dummy bottom panel, let's see what to do with that");
+                        });
+
+                    // right side panel with wav
+                    egui::SidePanel::right("right")
+                        .frame(
+                            Frame::default()
+                                .outer_margin(egui::Margin::same(0.0))
+                                .inner_margin(egui::Margin::same(0.0)),
+                        )
+                        .show(ctx, |ui| {
+                            // right wave panel
+                            for (i, enabled) in self.enabled.iter().enumerate() {
+                                let opt_cut = self.cuts.get_mut(i).unwrap();
+                                if *enabled {
+                                    egui::Frame::canvas(ui.style())
+                                        .outer_margin(egui::Margin::same(3.0))
+                                        .inner_margin(egui::Margin::same(0.0))
+                                        .show(ui, |ui| {
+                                            if let Some((cut, wav, wav_data)) = opt_cut {
+                                                wav.ui_content(
+                                                    ui,
+                                                    cut,
+                                                    wav_data,
+                                                    &self.config,
+                                                    cut_height,
+                                                );
+                                            }
+                                        });
+                                }
                             }
                         });
-                    });
 
-                // the cut panel
-                egui::CentralPanel::default()
-                    .frame(egui::Frame::default().inner_margin(egui::Margin::same(5.0)))
-                    .show(ctx, |ui| {
-                        // main cut panel
-                        egui::Frame::canvas(ui.style()).show(ui, |ui| {
-                            if let Some((cut, _wav, _wav_data)) = opt_cut {
-                                cut.ui_content(ui, &self.config);
+                    // the cut panel
+                    egui::CentralPanel::default()
+                        .frame(
+                            Frame::default()
+                                .outer_margin(egui::Margin::same(0.0))
+                                .inner_margin(egui::Margin::same(0.0)),
+                        )
+                        .show(ctx, |ui| {
+                            // main cut panel
+                            for (i, enabled) in self.enabled.iter().enumerate() {
+                                let opt_cut = self.cuts.get_mut(i).unwrap();
+                                if *enabled {
+                                    egui::Frame::canvas(ui.style())
+                                        .outer_margin(egui::Margin::same(3.0))
+                                        .inner_margin(egui::Margin::same(0.0))
+                                        .show(ui, |ui| {
+                                            if let Some((cut, _wav, _wav_data)) = opt_cut {
+                                                cut.ui_content(ui, &self.config, cut_height);
+                                            }
+                                        });
+                                }
                             }
                         });
-                    });
+                }
             });
         });
+
+        // for (i, enabled) in self.enabled.iter().enumerate() {
+        //     if *enabled {
+        //         let mut ui = ui.child_ui(
+        //             Rect {
+        //                 min: Pos2::ZERO,
+        //                 max: Pos2 {
+        //                     x: ui.available_width(),
+        //                     y: cut_height,
+        //                 },
+        //             },
+
+        //         let opt_cut = self.cuts.get_mut(i).unwrap();
+        //         ui.set_height(cut_height);
+        //         ui.allocate_ui(egui::Vec2::new(200.0, cut_height), |ui| {
+        //             egui::SidePanel::right(egui::Id::new(i))
+        //                 .frame(
+        //                     egui::Frame::default()
+        //                         .inner_margin(egui::Margin::same(5.0)),
+        //                 )
+        //                 .show(ctx, |ui| {
+        //                     // right wave panel
+        //                     egui::Frame::canvas(ui.style()).show(ui, |ui| {
+        //                         if let Some((cut, wav, wav_data)) = opt_cut {
+        //                             wav.ui_content(ui, cut, wav_data, &self.config);
+        //                         }
+        //                     });
+        //                 });
+
+        //             // the cut panel
+        //             egui::CentralPanel::default()
+        //                 .frame(
+        //                     egui::Frame::default()
+        //                         .inner_margin(egui::Margin::same(5.0)),
+        //                 )
+        //                 //.show_inside(ui, |ui| {
+        //                 .show(ctx, |ui| {
+        //                     // main cut panel
+        //                     egui::Frame::canvas(ui.style()).show(ui, |ui| {
+        //                         if let Some((cut, _wav, _wav_data)) = opt_cut {
+        //                             cut.ui_content(ui, &self.config, height);
+        //                         }
+        //                     });
+        //                 });
+        //             // });
+        //         });
+        //     }
+        // }
+        //}
+        //});
+        //});
     }
 }

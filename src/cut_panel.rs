@@ -163,9 +163,10 @@ impl Cut {
     }
 
     /// main panel
-    pub fn ui_content(&mut self, ui: &mut Ui, config: &Config) -> egui::Response {
+    pub fn ui_content(&mut self, ui: &mut Ui, config: &Config, height: f32) -> egui::Response {
         let (response, painter) = ui.allocate_painter(
-            Vec2::new(ui.available_width(), ui.available_height()),
+            // Vec2::new(ui.available_width(), ui.available_height()),
+            Vec2::new(ui.available_width(), height),
             Sense::click_and_drag(),
         );
 
