@@ -24,6 +24,8 @@ fn main() -> Result<(), eframe::Error> {
 
 #[derive(Default)]
 struct App {
+    ///
+    enabled: [bool; 10],
     /// we have 10 save slots
     cuts: [Option<(Cut, Wav, WavData)>; 10],
     /// index of selected cut
@@ -45,19 +47,20 @@ impl eframe::App for App {
                             "..."
                         };
 
-                        let button = ui.button(format!("{} {}", i, path,));
+                        let button =
+                            ui.toggle_value(&mut self.enabled[i], format!("{} {}", i, path,));
                         if button.clicked() {
                             self.cur_cut = i;
-                        }
-                        if button.double_clicked() {
-                            if let Some(path) = rfd::FileDialog::new()
-                                .add_filter("wav", &["wav"])
-                                .set_directory("./audio/")
-                                .pick_file()
-                            {
-                                println!("path {:?}", path);
-                                let (w, wd) = Wav::load(path);
-                                *opt_cut = Some((Cut::default(), w, wd));
+                            if opt_cut.is_none() || button.double_clicked() {
+                                if let Some(path) = rfd::FileDialog::new()
+                                    .add_filter("wav", &["wav"])
+                                    .set_directory("./audio/")
+                                    .pick_file()
+                                {
+                                    println!("path {:?}", path);
+                                    let (w, wd) = Wav::load(path);
+                                    *opt_cut = Some((Cut::default(), w, wd));
+                                }
                             }
                         }
                     }
