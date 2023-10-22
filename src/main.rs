@@ -63,6 +63,30 @@ impl eframe::App for App {
             // left side panel
             egui::SidePanel::left("left_id").show(ctx, |ui| {
                 ui.vertical(|ui| {
+                    // keyboard events
+                    ui.input(|i| {
+                        if i.key_pressed(Key::ArrowDown) {
+                            self.cur_cut = (self.cur_cut + 1) % 10;
+                        }
+
+                        if i.key_pressed(Key::ArrowUp) {
+                            self.cur_cut = (10 + self.cur_cut - 1) % 10;
+                        }
+
+                        use Key::*;
+                        let dig = [Num0, Num1, Num2, Num3, Num4, Num5, Num6, Num7, Num8, Num9];
+
+                        dig.iter().enumerate().for_each(|(num, key)| {
+                            if i.key_pressed(*key) {
+                                self.cur_cut = num;
+                                self.enabled[num] = true;
+                                if !i.modifiers.contains(Modifiers::SHIFT) {
+                                    clear_cuts(&mut self.enabled, num)
+                                }
+                            }
+                        })
+                    });
+
                     // clear all selected
                     if ui.button("Clear all selected cuts").clicked() {
                         clear_cuts(&mut self.enabled, 10);
@@ -104,58 +128,11 @@ impl eframe::App for App {
                         if button.double_clicked() || (self.enabled[i] && opt_cut.is_none()) {
                             load(opt_cut);
                         }
-                        //     );
-                        // let mut enter = false;
-                        // ui.input(|is| {
-                        //     if is.key_pressed(Key::Enter)
-                        //         && button.interact(Sense::hover()).hovered()
-                        //     {
-                        //         self.enabled[i] ^= true;
-                        //         enter = true;
-                        //         println!("toggle i {}", i);
-                        //     }
-                        // });
-                        // ui.input(|is| {
-
-                        // if enter || button.clicked() {
-                        //     if ui.input(|is| is.modifiers) != Modifiers::SHIFT {
-                        //         clear_cuts(&mut self.enabled, i)
-                        //     }
-
-                        //     self.cur_cut = i;
-
-                        //     if opt_cut.is_none() || button.double_clicked() {
-                        //         load(opt_cut);
-                        //     }
-                        //     // assert!(opt_cut.is_some());
-                        // }
-
-                        // });
 
                         if self.cur_cut == i {
                             button.highlight();
                         };
                     }
-
-                    ui.input(|i| {
-                        if i.key_pressed(Key::ArrowDown) {
-                            self.cur_cut = (self.cur_cut + 1) % 10;
-                        }
-
-                        if i.key_pressed(Key::ArrowUp) {
-                            self.cur_cut = (10 + self.cur_cut - 1) % 10;
-                        }
-
-                        use Key::*;
-                        let dig = [Num0, Num1, Num2, Num3, Num4, Num5, Num6, Num7, Num8, Num9];
-
-                        dig.iter().enumerate().for_each(|(num, key)| {
-                            if i.key_pressed(*key) {
-                                self.cur_cut = num;
-                                self.enabled[num] = true;
-                            }
-                        })
-                    });
 
                     ui.separator();
 
