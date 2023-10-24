@@ -75,8 +75,8 @@ impl Wav {
     }
 
     /// control panel
-    pub fn ui_content_ctrl(&mut self, ui: &mut Ui, wav_data: &WavData) {
-        ui.label(&wav_data.filename);
+    pub fn ui_content_ctrl(&mut self, ui: &mut Ui, wav_data: &WavData, i: usize) {
+        ui.label(format!("#{}: {}", i, wav_data.filename));
         // ui.label(format!("{}", self.path.display()));
 
         ui.horizontal(|ui| {

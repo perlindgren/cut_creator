@@ -64,6 +64,7 @@ impl eframe::App for App {
             egui::SidePanel::left("left_id").show(ctx, |ui| {
                 ui.vertical(|ui| {
                     // keyboard events
+
                     if !ctx.wants_keyboard_input() {
                         ui.input(|i| {
                             if i.key_pressed(Key::ArrowDown) {
@@ -81,14 +82,34 @@ impl eframe::App for App {
                             dig.iter().enumerate().for_each(|(num, key)| {
                                 if i.key_pressed(*key) {
                                     self.cur_cut = num;
-                                    self.enabled[num] = true;
-                                    if !i.modifiers.contains(Modifiers::SHIFT) {
-                                        clear_cuts(&mut self.enabled, num)
-                                    }
+                                    self.enabled[num] ^= true;
+                                    // if !i.modifiers.contains(Modifiers::SHIFT) {
+                                    //     println!("clear cuts");
+                                    //     clear_cuts(&mut self.enabled, num)
+                                    // } else {
+                                    //     println!("SHIFT, do not clear cuts");
+                                    // }
                                 }
                             })
                         });
                     }
+
+                    ui.label("Settings");
+                    ui.add_space(10.0);
+                    ui.checkbox(&mut self.config.knot_line, "knot lines");
+
+                    let mut text = format!("{}", self.config.step_size);
+                    ui.horizontal(|ui| {
+                        ui.label("Step Size");
+                        if ui.add(egui::TextEdit::singleline(&mut text)).changed() {
+                            self.config.step_size = text.parse().unwrap_or(self.config.step_size);
+                        }
+                    });
+
+                    ui.separator();
+
+                    ui.label("Selected Cuts");
+                    ui.add_space(10.0);
 
                     // clear all selected
                     if ui.button("Clear all selected cuts").clicked() {
@@ -139,18 +160,11 @@ impl eframe::App for App {
                     }
 
                     ui.separator();
-
-                    ui.checkbox(&mut self.config.knot_line, "knot lines");
-
-                    let mut text = format!("{}", self.config.step_size);
-                    ui.horizontal(|ui| {
-                        ui.label("Step Size");
-                        ui.add(egui::TextEdit::singleline(&mut text));
-                    });
-                    self.config.step_size = text.parse().unwrap_or(self.config.step_size);
+                    ui.label("Cut Settings");
+                    ui.add_space(10.0);
 
                     if let Some((cut, wav, wav_data)) = &mut self.cuts[self.cur_cut] {
-                        wav.ui_content_ctrl(ui, wav_data);
+                        wav.ui_content_ctrl(ui, wav_data, self.cur_cut);
 
                         cut.ui_content_settings(ui);
                     }
@@ -192,10 +206,10 @@ impl eframe::App for App {
                     let height = ui.available_height();
                     let _width = ui.available_width();
                     let cut_height = (height - 20.0 - nr_enabled as f32 * 10.0) / nr_enabled as f32;
-                    println!(
-                        "nr enabled {} height {}, cut_height {}",
-                        nr_enabled, height, cut_height
-                    );
+                    // println!(
+                    //     "nr enabled {} height {}, cut_height {}",
+                    //     nr_enabled, height, cut_height
+                    // );
 
                     // right side panel with wav
                     egui::SidePanel::right("right")
