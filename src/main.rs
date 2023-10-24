@@ -1,5 +1,8 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
 
+use std::fs::File;
+use std::io::prelude::*;
+
 use cut_creator::{
     config::Config,
     cut_panel::Cut,
@@ -17,11 +20,17 @@ fn main() -> Result<(), eframe::Error> {
         initial_window_size: Some(egui::vec2(1000.0, 500.0)),
         ..Default::default()
     };
-    eframe::run_native(
-        "Cut Creator",
-        options,
-        Box::new(|_cc| Box::<App>::default()),
-    )
+
+    let mut app = Box::<App>::default();
+    // load config
+    if let Ok(mut file) = File::open("config.json") {
+        let mut json = String::new();
+        file.read_to_string(&mut json).unwrap();
+        println!("json {}", json);
+        app.config = serde_json::from_str(&json).unwrap();
+    }
+
+    eframe::run_native("Cut Creator", options, Box::new(|_cc| app))
 }
 
 #[derive(Default)]
@@ -58,11 +67,113 @@ fn load(opt_cut: &mut Option<(Cut, Wav, WavData)>) {
 }
 
 impl eframe::App for App {
+    ///
+    fn on_exit(&mut self, _gl: Option<&eframe::glow::Context>) {
+        println!("exit");
+        // Serialize it to a JSON string.
+        let json = serde_json::to_string(&self.config).unwrap();
+        println!("config {}", json);
+
+        let mut file = File::create("config.json").unwrap();
+        file.write_all(json.as_bytes()).unwrap();
+    }
+
+    ///
+    fn on_close_event(&mut self) -> bool {
+        println!("close");
+        true
+    }
+
+    /// update
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         egui::CentralPanel::default().show(ctx, |_ui| {
             // left side panel
             egui::SidePanel::left("left_id").show(ctx, |ui| {
                 ui.vertical(|ui| {
+                    ui.checkbox(&mut self.config.knot_line, "knot lines");
+
+                    let mut text = format!("{}", self.config.step_size);
+                    ui.horizontal(|ui| {
+                        ui.label("Step Size");
+                        let edit = ui.add(egui::TextEdit::singleline(&mut text));
+                        if edit.changed() {
+                            self.config.step_size = text.parse().unwrap_or(self.config.step_size);
+                        }
+
+                        if edit.lost_focus() {
+                            ui.input_mut(|i| {
+                                println!("lost focus");
+                                i.consume_key(Modifiers::NONE, Key::Enter);
+                            })
+                        }
+                    });
+
+                    ui.separator();
+
+                    // clear all selected
+                    if ui.button("Clear all selected cuts").clicked() {
+                        clear_cuts(&mut self.enabled, 10);
+                    }
+
+                    // enabling
+                    // on first click load cut
+                    // consecutive click to select cut as active
+                    // shift click to multi select cuts
+                    // double click allows to load new sample
+                    for (i, opt_cut) in self.cuts.iter_mut().enumerate() {
+                        let path: &str = if let Some((_c, _w, wd)) = opt_cut {
+                            &wd.filename
+                        } else {
+                            "..."
+                        };
+
+                        // each cut has a corresponding button
+                        let button =
+                            ui.selectable_label(self.enabled[i], format!("#{}: {}", i, path,));
+
+                        // check hover
+                        let mut hover = false;
+                        if button.interact(Sense::hover()).hovered() {
+                            self.cur_cut = i;
+                            hover = true;
+                        }
+
+                        if button.clicked() {
+                            self.enabled[i] ^= true;
+                            println!("clicked");
+                        }
+
+                        ui.input(|is| {
+                            if is.key_pressed(Key::Enter)
+                            // && button.interact(Sense::hover()).hovered()
+                            {
+                                println!("enter");
+                                self.enabled[i] ^= true;
+                            }
+                        });
+
+                        // ui.input(|mut is| {
+                        //     if is.consume_shortcut(&KeyboardShortcut::new(Modifiers::CTRL, Key::O))
+                        //     {
+                        //         println!("Ctrl-O");
+                        //     }
+                        // });
+
+                        // load cut
+                        let enable_new = self.enabled[i] && opt_cut.is_none();
+                        if enable_new {
+                            println!("enable_new i {}", i);
+                        }
+
+                        if button.double_clicked() || enable_new {
+                            load(opt_cut);
+                        }
+
+                        if self.cur_cut == i {
+                            button.highlight();
+                        };
+                    }
+
                     // keyboard events
 
                     if !ctx.wants_keyboard_input() {
@@ -267,56 +378,5 @@ impl eframe::App for App {
                 }
             });
         });
-
-        // for (i, enabled) in self.enabled.iter().enumerate() {
-        //     if *enabled {
-        //         let mut ui = ui.child_ui(
-        //             Rect {
-        //                 min: Pos2::ZERO,
-        //                 max: Pos2 {
-        //                     x: ui.available_width(),
-        //                     y: cut_height,
-        //                 },
-        //             },
-
-        //         let opt_cut = self.cuts.get_mut(i).unwrap();
-        //         ui.set_height(cut_height);
-        //         ui.allocate_ui(egui::Vec2::new(200.0, cut_height), |ui| {
-        //             egui::SidePanel::right(egui::Id::new(i))
-        //                 .frame(
-        //                     egui::Frame::default()
-        //                         .inner_margin(egui::Margin::same(5.0)),
-        //                 )
-        //                 .show(ctx, |ui| {
-        //                     // right wave panel
-        //                     egui::Frame::canvas(ui.style()).show(ui, |ui| {
-        //                         if let Some((cut, wav, wav_data)) = opt_cut {
-        //                             wav.ui_content(ui, cut, wav_data, &self.config);
-        //                         }
-        //                     });
-        //                 });
-
-        //             // the cut panel
-        //             egui::CentralPanel::default()
-        //                 .frame(
-        //                     egui::Frame::default()
-        //                         .inner_margin(egui::Margin::same(5.0)),
-        //                 )
-        //                 //.show_inside(ui, |ui| {
-        //                 .show(ctx, |ui| {
-        //                     // main cut panel
-        //                     egui::Frame::canvas(ui.style()).show(ui, |ui| {
-        //                         if let Some((cut, _wav, _wav_data)) = opt_cut {
-        //                             cut.ui_content(ui, &self.config, height);
-        //                         }
-        //                     });
-        //                 });
-        //             // });
-        //         });
-        //     }
-        // }
-        //}
-        //});
-        //});
     }
 }

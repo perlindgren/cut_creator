@@ -1,7 +1,9 @@
+use egui::{Color32, Stroke};
 /// config
 ///
-use egui::{Color32, Stroke};
+use serde::{Deserialize, Serialize};
 
+#[derive(Deserialize, Serialize)]
 pub struct Config {
     /// Stroke selected.
     pub stroke_select: Stroke,
