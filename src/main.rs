@@ -176,15 +176,15 @@ impl eframe::App for App {
                     // double click allows to load new sample
                     for (i, opt_cut) in self.cuts.iter_mut().enumerate() {
                         // let path = opt_cut.map_or("...".to_string(), |(_, p)| p.get_path());
-                        let path: &str = if let Some((_c, _w, wd)) = opt_cut {
-                            &wd.filename
+                        let path = if let Some((cut, _w, wd)) = opt_cut {
+                            format!("{}{}", wd.filename, if cut.needs_save { "*" } else { "" })
                         } else {
-                            "..."
+                            "...".to_string()
                         };
 
                         // each cut has a corresponding button
                         let button =
-                            ui.selectable_label(self.enabled[i], format!("#{}: {}", i, path,));
+                            ui.selectable_label(self.enabled[i], format!("#{}: {}", i, path));
 
                         // check hover
                         if button.interact(Sense::hover()).hovered() {

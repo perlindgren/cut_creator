@@ -41,41 +41,57 @@ pub struct Cut {
     /// The control points.
     knots: Vec<Knot>,
 
-    /// Select rect
-    select_start: Pos2,
-
-    /// Select end
-    select_end: Pos2,
-
-    /// Select drag
-    select_drag: bool,
-
-    /// Move drag
-    move_drag: bool,
-
-    /// Pos for the start of moving points
-    move_start: Pos2,
-
-    /// Last position when moving
-    move_last: Pos2,
-
-    /// Start positions for each knot
-    move_knots: Vec<Pos2>,
-
-    /// Spline
-    spline: Spline<f32, f32>,
-
-    /// Cursor
-    cursor: Option<Pos2>,
-
-    /// Value
-    value: Option<f32>,
-
     /// Looping, the end point equates the start point
     looping: bool,
 
     /// Warping, the samples will warp across start/end
     warping: bool,
+
+    /// Spline
+    // TODO, should this be #[serde(Skip)]? (Default impl required)
+    spline: Spline<f32, f32>,
+
+    /// Run-time only data
+
+    /// Needs save
+    #[serde(skip)]
+    pub needs_save: bool,
+
+    /// Select rect
+    #[serde(skip)]
+    select_start: Pos2,
+
+    /// Select end
+    #[serde(skip)]
+    select_end: Pos2,
+
+    /// Select drag
+    #[serde(skip)]
+    select_drag: bool,
+
+    /// Move drag
+    #[serde(skip)]
+    move_drag: bool,
+
+    /// Pos for the start of moving points
+    #[serde(skip)]
+    move_start: Pos2,
+
+    /// Last position when moving
+    #[serde(skip)]
+    move_last: Pos2,
+
+    /// Start positions for each knot
+    #[serde(skip)]
+    move_knots: Vec<Pos2>,
+
+    /// Cursor
+    #[serde(skip)]
+    cursor: Option<Pos2>,
+
+    /// Value
+    #[serde(skip)]
+    value: Option<f32>,
 }
 
 impl Default for Cut {
@@ -116,6 +132,10 @@ impl Default for Cut {
             quantization: 16,
             bars: 2.0,
             knots,
+            spline,
+
+            // Non persistent data
+            needs_save: false,
             select_start: Pos2::ZERO,
             select_end: Pos2::ZERO,
             select_drag: false,
@@ -123,7 +143,6 @@ impl Default for Cut {
             move_start: Pos2::ZERO,
             move_last: Pos2::ZERO,
             move_knots: vec![],
-            spline,
             cursor: None,
             value: None,
             looping: false,
@@ -147,6 +166,8 @@ impl Cut {
 
     /// call to update spline when knots are changed
     pub fn update(&mut self) {
+        println!("---------------- update");
+        self.needs_save = true;
         let len = self.knots.len();
         // ensure that endpoints are aligned
         self.knots[0].pos.y = self.knots[1].pos.y;
@@ -202,6 +223,7 @@ impl Cut {
                 println!("cut {}", json);
 
                 if let Ok(mut file) = File::create(&self.path) {
+                    self.needs_save = false;
                     if let Err(err) = file.write_all(json.as_bytes()) {
                         println!("Err {:?}", err);
                     };
