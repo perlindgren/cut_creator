@@ -2,7 +2,7 @@ use crate::config::Config;
 use egui::epaint::PathShape;
 use egui::*;
 use epaint::RectShape;
-use splines::{Interpolation, Key, Spline};
+use splines::{Interpolation, Spline};
 
 use serde::{Deserialize, Serialize};
 use std::{fs::File, io::prelude::*, path::PathBuf, str::FromStr};
@@ -123,7 +123,7 @@ impl Default for Cut {
         let spline = Spline::from_iter(
             knots
                 .iter()
-                .map(|k| Key::new(k.pos.x, k.pos.y, Interpolation::CatmullRom)),
+                .map(|k| splines::Key::new(k.pos.x, k.pos.y, Interpolation::CatmullRom)),
         );
 
         Self {
@@ -181,7 +181,7 @@ impl Cut {
         self.spline = Spline::from_iter(
             self.knots
                 .iter()
-                .map(|k| Key::new(k.pos.x, k.pos.y, Interpolation::CatmullRom)),
+                .map(|k| splines::Key::new(k.pos.x, k.pos.y, Interpolation::CatmullRom)),
         );
     }
 
@@ -206,7 +206,13 @@ impl Cut {
             println!("warping {}", self.warping)
         }
 
-        if ui.button("Save Cut").clicked() {
+        if ui
+            .button("Save Cut")
+            // TODO
+            //.shortcut_text(Context::format_shortcut("Ctrl-S"))
+            .clicked()
+            || ui.input_mut(|i| i.consume_key(Modifiers::CTRL, Key::S))
+        {
             let directory = self.path.parent().unwrap();
             println!("directory : {:?}", directory);
             let file_name = self.path.file_name().unwrap().to_string_lossy();
