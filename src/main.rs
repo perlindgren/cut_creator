@@ -11,8 +11,6 @@ use cut_creator::{
 
 use egui::*;
 
-// use std::fmt::Display;
-// use std::path::Path;
 fn main() -> Result<(), eframe::Error> {
     env_logger::init(); // Log to stderr (if you run with `RUST_LOG=debug`).
 
@@ -54,7 +52,7 @@ fn clear_cuts(enabled: &mut [bool; 10], i: usize) {
     }
 }
 
-fn load(opt_cut: &mut Option<(Cut, Wav, WavData)>) {
+fn load_wav(opt_cut: &mut Option<(Cut, Wav, WavData)>) {
     if let Some(path) = rfd::FileDialog::new()
         .add_filter("wav", &["wav"])
         .set_directory("./audio/")
@@ -65,6 +63,8 @@ fn load(opt_cut: &mut Option<(Cut, Wav, WavData)>) {
         *opt_cut = Some((Cut::default(), w, wd));
     }
 }
+
+
 
 impl eframe::App for App {
     ///
@@ -90,90 +90,6 @@ impl eframe::App for App {
             // left side panel
             egui::SidePanel::left("left_id").show(ctx, |ui| {
                 ui.vertical(|ui| {
-                    ui.checkbox(&mut self.config.knot_line, "knot lines");
-
-                    let mut text = format!("{}", self.config.step_size);
-                    ui.horizontal(|ui| {
-                        ui.label("Step Size");
-                        let edit = ui.add(egui::TextEdit::singleline(&mut text));
-                        if edit.changed() {
-                            self.config.step_size = text.parse().unwrap_or(self.config.step_size);
-                        }
-
-                        if edit.lost_focus() {
-                            ui.input_mut(|i| {
-                                println!("lost focus");
-                                i.consume_key(Modifiers::NONE, Key::Enter);
-                            })
-                        }
-                    });
-
-                    ui.separator();
-
-                    // clear all selected
-                    if ui.button("Clear all selected cuts").clicked() {
-                        clear_cuts(&mut self.enabled, 10);
-                    }
-
-                    // enabling
-                    // on first click load cut
-                    // consecutive click to select cut as active
-                    // shift click to multi select cuts
-                    // double click allows to load new sample
-                    for (i, opt_cut) in self.cuts.iter_mut().enumerate() {
-                        let path: &str = if let Some((_c, _w, wd)) = opt_cut {
-                            &wd.filename
-                        } else {
-                            "..."
-                        };
-
-                        // each cut has a corresponding button
-                        let button =
-                            ui.selectable_label(self.enabled[i], format!("#{}: {}", i, path,));
-
-                        // check hover
-                        let mut hover = false;
-                        if button.interact(Sense::hover()).hovered() {
-                            self.cur_cut = i;
-                            hover = true;
-                        }
-
-                        if button.clicked() {
-                            self.enabled[i] ^= true;
-                            println!("clicked");
-                        }
-
-                        ui.input(|is| {
-                            if is.key_pressed(Key::Enter)
-                            // && button.interact(Sense::hover()).hovered()
-                            {
-                                println!("enter");
-                                self.enabled[i] ^= true;
-                            }
-                        });
-
-                        // ui.input(|mut is| {
-                        //     if is.consume_shortcut(&KeyboardShortcut::new(Modifiers::CTRL, Key::O))
-                        //     {
-                        //         println!("Ctrl-O");
-                        //     }
-                        // });
-
-                        // load cut
-                        let enable_new = self.enabled[i] && opt_cut.is_none();
-                        if enable_new {
-                            println!("enable_new i {}", i);
-                        }
-
-                        if button.double_clicked() || enable_new {
-                            load(opt_cut);
-                        }
-
-                        if self.cur_cut == i {
-                            button.highlight();
-                        };
-                    }
-
                     // keyboard events
 
                     if !ctx.wants_keyboard_input() {
@@ -262,7 +178,7 @@ impl eframe::App for App {
 
                         // load cut
                         if button.double_clicked() || (self.enabled[i] && opt_cut.is_none()) {
-                            load(opt_cut);
+                            load_wav(opt_cut);
                         }
 
                         if self.cur_cut == i {

@@ -4,6 +4,9 @@ use egui::*;
 use epaint::RectShape;
 use splines::{Interpolation, Key, Spline};
 
+use serde::{Deserialize, Serialize};
+use std::{fs::File, io::prelude::*};
+
 /// cut_panel
 ///
 /// A cut is defined by a spline with CatmullRom interpolation.
@@ -13,7 +16,7 @@ use splines::{Interpolation, Key, Spline};
 ///
 /// The loop option forces S <-> E, which ensures that the cut can be smoothly looped.
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, Serialize, Deserialize)]
 pub struct Knot {
     /// x position in terms of bars. 0.25 -> 1st quarter in 1st bar
     /// y position in terms of relative sample position 0.0 beginning of sample 1.0 end of sample.
@@ -21,6 +24,7 @@ pub struct Knot {
     selected: bool,
 }
 
+#[derive(Serialize, Deserialize)]
 pub struct Cut {
     /// Quantization 4 -> 1/4 = 0.25 (quarter notes), 16-> 1/16 (six teens), etc.
     quantization: u32,
@@ -121,6 +125,18 @@ impl Default for Cut {
 }
 
 impl Cut {
+    /// load cut
+    fn load_cut() -> Result<Self, ()> {
+        if let Some(path) = rfd::FileDialog::new()
+            .add_filter("cut", &["cut"])
+            .set_directory("./audio/")
+            .pick_file()
+        {
+            println!("path {:?}", path);
+        }
+        Err(())
+    }
+
     /// call to update spline when knots are changed
     pub fn update(&mut self) {
         let len = self.knots.len();
@@ -159,6 +175,25 @@ impl Cut {
 
         if ui.checkbox(&mut self.warping, "warping").clicked() {
             println!("warping {}", self.warping)
+        }
+
+        if ui.button("Save Cut").clicked() {
+            if let Some(path) = rfd::FileDialog::new()
+                .add_filter("cut", &["cut"])
+                .set_directory("./audio/")
+                .save_file()
+            {
+                println!("path {:?}", path);
+                // Serialize it to a JSON string.
+                let json = serde_json::to_string(&self).unwrap();
+                println!("cut {}", json);
+
+                if let Ok(mut file) = File::create(path) {
+                    if let Err(err) = file.write_all(json.as_bytes()) {
+                        println!("Err {:?}", err);
+                    };
+                }
+            }
         }
     }
 
