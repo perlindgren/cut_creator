@@ -5,7 +5,7 @@ use epaint::RectShape;
 use splines::{Interpolation, Key, Spline};
 
 use serde::{Deserialize, Serialize};
-use std::{fs::File, io::prelude::*};
+use std::{fs::File, io::prelude::*, path::PathBuf, str::FromStr};
 
 /// cut_panel
 ///
@@ -24,8 +24,14 @@ pub struct Knot {
     selected: bool,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct Cut {
+    /// path to the cut
+    path: PathBuf,
+
+    /// path to the sample
+    pub sample_path: Option<PathBuf>,
+
     /// Quantization 4 -> 1/4 = 0.25 (quarter notes), 16-> 1/16 (six teens), etc.
     quantization: u32,
 
@@ -105,6 +111,8 @@ impl Default for Cut {
         );
 
         Self {
+            path: PathBuf::from_str(".audio/cut.cut").unwrap(),
+            sample_path: None,
             quantization: 16,
             bars: 2.0,
             knots,
@@ -178,17 +186,22 @@ impl Cut {
         }
 
         if ui.button("Save Cut").clicked() {
+            let directory = self.path.parent().unwrap();
+            println!("directory : {:?}", directory);
+            let file_name = self.path.file_name().unwrap().to_string_lossy();
             if let Some(path) = rfd::FileDialog::new()
                 .add_filter("cut", &["cut"])
-                .set_directory("./audio/")
+                .set_directory(directory)
+                .set_file_name(file_name)
                 .save_file()
             {
                 println!("path {:?}", path);
+                self.path = path;
                 // Serialize it to a JSON string.
                 let json = serde_json::to_string(&self).unwrap();
                 println!("cut {}", json);
 
-                if let Ok(mut file) = File::create(path) {
+                if let Ok(mut file) = File::create(&self.path) {
                     if let Err(err) = file.write_all(json.as_bytes()) {
                         println!("Err {:?}", err);
                     };

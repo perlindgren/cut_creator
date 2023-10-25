@@ -1,7 +1,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
 
-use std::fs::File;
 use std::io::prelude::*;
+use std::{ffi::OsStr, fs::File};
 
 use cut_creator::{
     config::Config,
@@ -54,17 +54,42 @@ fn clear_cuts(enabled: &mut [bool; 10], i: usize) {
 
 fn load_wav(opt_cut: &mut Option<(Cut, Wav, WavData)>) {
     if let Some(path) = rfd::FileDialog::new()
-        .add_filter("wav", &["wav"])
+        .add_filter("wav", &["wav", "cut"])
         .set_directory("./audio/")
         .pick_file()
     {
         println!("path {:?}", path);
-        let (w, wd) = Wav::load(path);
-        *opt_cut = Some((Cut::default(), w, wd));
+        if let Some(ext) = path.extension() {
+            println!("ext {:?}", ext);
+            match ext.to_str() {
+                Some("wav") => {
+                    println!("wav");
+                    let (w, wd) = Wav::load(path.clone());
+                    let mut cut = Cut::default();
+                    cut.sample_path = Some(path);
+
+                    *opt_cut = Some((cut, w, wd));
+                }
+                Some("cut") => {
+                    println!("cut");
+                    if let Ok(mut file) = File::open(path) {
+                        let mut json = String::new();
+                        file.read_to_string(&mut json).unwrap();
+                        println!("json {}", json);
+                        let cut: Cut = serde_json::from_str(&json).unwrap();
+                        println!("cut {:?}", cut);
+
+                        if let Some(sample_path) = cut.sample_path.clone() {
+                            let (w, wd) = Wav::load(sample_path);
+                            *opt_cut = Some((cut, w, wd));
+                        }
+                    }
+                }
+                _ => {}
+            };
+        }
     }
 }
-
-
 
 impl eframe::App for App {
     ///
