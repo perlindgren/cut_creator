@@ -31,7 +31,7 @@ pub struct Knot {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Cut {
     /// path to the cut
-    pub path: PathBuf,
+    pub cut_path: PathBuf,
 
     /// path to the sample
     pub sample_path: Option<PathBuf>,
@@ -144,7 +144,7 @@ impl Default for Cut {
         let quantization = 16;
 
         Self {
-            path: PathBuf::new(),
+            cut_path: PathBuf::new(),
             sample_path: None,
             quantization,
             bars,
@@ -172,7 +172,7 @@ impl Default for Cut {
 }
 
 impl Cut {
-    pub fn load_wav() -> Result<Cut, String> {
+    pub fn load_file() -> Result<Cut, String> {
         match rfd::FileDialog::new()
             .add_filter("wav", &["wav", "cut"])
             .set_directory("./audio/")
@@ -188,13 +188,16 @@ impl Cut {
                             Some("wav") => {
                                 // loading wav only, set the cut to default
                                 trace!("load wav");
-                                let mut cut = Cut::default();
-                                cut.wav_data = WavData::load_wav_data(path.clone());
+                                let mut cut = Cut {
+                                    wav_data: WavData::load_wav_data(path.clone())?,
+                                    ..Cut::default()
+                                };
+
                                 cut.wav.len = cut.wav_data.len;
                                 println!("path {}", path.display());
                                 cut.sample_path = Some(path.clone());
                                 path.set_extension("cut");
-                                cut.path = path;
+                                cut.cut_path = path;
                                 Ok(cut)
                             }
                             Some("cut") => {
@@ -207,7 +210,7 @@ impl Cut {
                                     trace!("cut {:?}", cut);
 
                                     if let Some(sample_path) = cut.sample_path.clone() {
-                                        cut.wav_data = WavData::load_wav_data(sample_path);
+                                        cut.wav_data = WavData::load_wav_data(sample_path)?;
                                     }
                                     Ok(cut)
                                 } else {
@@ -227,9 +230,11 @@ impl Cut {
 
     // name
     pub fn name(&self) -> String {
-        self.path.file_name().map_or("<TBD>".to_string(), |path| {
-            path.to_string_lossy().to_string()
-        })
+        self.cut_path
+            .file_name()
+            .map_or("<TBD>".to_string(), |path| {
+                path.to_string_lossy().to_string()
+            })
     }
 
     // /// load cut
@@ -259,7 +264,7 @@ impl Cut {
         self.knots[len - 1].pos.y = self.knots[len - 2].pos.y;
 
         // add knots besides last two
-        self.spline = Spline::from_iter(self.knots[..len - 2].iter().map(|k| key(k)));
+        self.spline = Spline::from_iter(self.knots[..len - 2].iter().map(key));
 
         // add last two knots
         if self.looping {
@@ -295,14 +300,14 @@ impl Cut {
         let json = serde_json::to_string(&self).unwrap();
         trace!("cut json {}", json);
 
-        match File::create(&self.path) {
+        match File::create(&self.cut_path) {
             Ok(mut file) => {
                 self.needs_save = false;
                 if let Err(err) = file.write_all(json.as_bytes()) {
                     println!("Err {:?}", err);
                     format!("{:?}", err)
                 } else {
-                    format!("Cut saved to {:?}", self.path)
+                    format!("Cut saved to {:?}", self.cut_path)
                 }
             }
             Err(err) => {
@@ -313,9 +318,9 @@ impl Cut {
 
     ///
     fn save_cut_dialogue(&mut self) -> String {
-        let directory = self.path.parent().unwrap();
+        let directory = self.cut_path.parent().unwrap();
         trace!("directory : {:?}", directory);
-        let file_name = self.path.file_name().unwrap().to_string_lossy();
+        let file_name = self.cut_path.file_name().unwrap().to_string_lossy();
         if let Some(path) = rfd::FileDialog::new()
             .add_filter("cut", &["cut"])
             .set_directory(directory)
@@ -323,7 +328,7 @@ impl Cut {
             .save_file()
         {
             trace!("cut path {:?}", path);
-            self.path = path;
+            self.cut_path = path;
             self.save_cut()
         } else {
             "Save cancelled.".to_string()
@@ -388,8 +393,7 @@ impl Cut {
                 .inverse()
                 .transform_pos(response.interact_pointer_pos().unwrap());
             let index = (pos.x / scale) as usize;
-            println!("pos {:?}, in segs {:?}", pos, index);
-            self.fader[(pos.x / scale) as usize] ^= true;
+            self.fader[index] ^= true;
         }
 
         let mut fader = vec![to_screen * Pos2::new(0.0, height)];

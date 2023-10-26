@@ -56,7 +56,7 @@ fn clear_cuts(enabled: &mut [bool; 10], i: usize) {
 }
 
 impl eframe::App for App {
-    ///
+    /// on exit
     fn on_exit(&mut self, _gl: Option<&eframe::glow::Context>) {
         trace!("exit");
         // Serialize it to a JSON string.
@@ -67,7 +67,7 @@ impl eframe::App for App {
         file.write_all(json.as_bytes()).unwrap();
     }
 
-    ///
+    /// on close event
     fn on_close_event(&mut self) -> bool {
         trace!("close");
         if self.cuts.iter().any(|opt_cut| {
@@ -87,7 +87,6 @@ impl eframe::App for App {
     /// update
     fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
         // close dialog
-
         if self.show_confirmation_dialog {
             // Show confirmation dialog:
             egui::Window::new("You have unsaved cuts. Quit?")
@@ -191,7 +190,7 @@ impl eframe::App for App {
                         }
 
                         if button.double_clicked() {
-                            self.status = match Cut::load_wav() {
+                            self.status = match Cut::load_file() {
                                 Ok(cut) => {
                                     *opt_cut = Some(cut);
                                     "File loaded".to_string()
@@ -212,10 +211,11 @@ impl eframe::App for App {
                     });
 
                     if ui.input_mut(|i| i.consume_key(Modifiers::CTRL, Key::O)) {
-                        self.status = match Cut::load_wav() {
+                        self.status = match Cut::load_file() {
                             Ok(cut) => {
+                                let path = cut.cut_path.clone();
                                 self.cuts[self.cur_cut] = Some(cut);
-                                "File loaded".to_string()
+                                format!("File loaded {}", path.to_string_lossy())
                             }
                             Err(err) => err,
                         }
