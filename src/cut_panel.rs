@@ -7,6 +7,7 @@ use splines::{Interpolation, Spline};
 use serde::{Deserialize, Serialize};
 use std::{fs::File, io::prelude::*, path::PathBuf, str::FromStr};
 
+use log::trace;
 /// cut_panel
 ///
 /// A cut is defined by a spline with CatmullRom interpolation.
@@ -152,21 +153,28 @@ impl Default for Cut {
 }
 
 impl Cut {
+    /// name
+    pub fn name(&self) -> String {
+        self.path.file_name().map_or("<TBD>".to_string(), |path| {
+            path.to_string_lossy().to_string()
+        })
+    }
+
     /// load cut
-    fn load_cut() -> Result<Self, ()> {
+    fn _load_cut() -> Result<Self, ()> {
         if let Some(path) = rfd::FileDialog::new()
             .add_filter("cut", &["cut"])
             .set_directory("./audio/")
             .pick_file()
         {
-            println!("path {:?}", path);
+            trace!("load cut path {:?}", path);
         }
         Err(())
     }
 
     /// call to update spline when knots are changed
     pub fn update(&mut self) {
-        println!("---------------- update");
+        trace!("update knots and spline");
         self.needs_save = true;
         let len = self.knots.len();
         // ensure that endpoints are aligned
@@ -195,46 +203,66 @@ impl Cut {
         self.value
     }
 
-    /// settings
-    pub fn ui_content_settings(&mut self, ui: &mut Ui) {
-        if ui.checkbox(&mut self.looping, "looping").clicked() {
-            println!("looping {}", self.looping);
-            self.update();
-        }
+    /// save cut
+    fn save_cut(&mut self) -> String {
+        // Serialize it to a JSON string.
+        let json = serde_json::to_string(&self).unwrap();
+        trace!("cut json {}", json);
 
-        if ui.checkbox(&mut self.warping, "warping").clicked() {
-            println!("warping {}", self.warping)
+        match File::create(&self.path) {
+            Ok(mut file) => {
+                self.needs_save = false;
+                if let Err(err) = file.write_all(json.as_bytes()) {
+                    println!("Err {:?}", err);
+                    format!("{:?}", err)
+                } else {
+                    format!("Cut saved to {:?}", self.path)
+                }
+            }
+            Err(err) => {
+                format!("{:?}", err)
+            }
+        }
+    }
+
+    ///
+    fn save_cut_dialogue(&mut self) -> String {
+        let directory = self.path.parent().unwrap();
+        trace!("directory : {:?}", directory);
+        let file_name = self.path.file_name().unwrap().to_string_lossy();
+        if let Some(path) = rfd::FileDialog::new()
+            .add_filter("cut", &["cut"])
+            .set_directory(directory)
+            .set_file_name(file_name)
+            .save_file()
+        {
+            trace!("cut path {:?}", path);
+            self.path = path;
+            self.save_cut()
+        } else {
+            "Save cancelled.".to_string()
+        }
+    }
+
+    /// settings
+    pub fn ui_content_settings(&mut self, ui: &mut Ui, status: &mut String) {
+        if ui.checkbox(&mut self.looping, "looping").clicked()
+            || ui.checkbox(&mut self.warping, "warping").clicked()
+        {
+            self.update()
         }
 
         if ui
             .button("Save Cut")
             // TODO
-            //.shortcut_text(Context::format_shortcut("Ctrl-S"))
             .clicked()
             || ui.input_mut(|i| i.consume_key(Modifiers::CTRL, Key::S))
         {
-            let directory = self.path.parent().unwrap();
-            println!("directory : {:?}", directory);
-            let file_name = self.path.file_name().unwrap().to_string_lossy();
-            if let Some(path) = rfd::FileDialog::new()
-                .add_filter("cut", &["cut"])
-                .set_directory(directory)
-                .set_file_name(file_name)
-                .save_file()
-            {
-                println!("path {:?}", path);
-                self.path = path;
-                // Serialize it to a JSON string.
-                let json = serde_json::to_string(&self).unwrap();
-                println!("cut {}", json);
+            *status = self.save_cut();
+        }
 
-                if let Ok(mut file) = File::create(&self.path) {
-                    self.needs_save = false;
-                    if let Err(err) = file.write_all(json.as_bytes()) {
-                        println!("Err {:?}", err);
-                    };
-                }
-            }
+        if ui.input_mut(|i| i.consume_key(Modifiers::CTRL | Modifiers::SHIFT, Key::S)) {
+            *status = self.save_cut_dialogue();
         }
     }
 
@@ -601,7 +629,7 @@ impl Cut {
                 self.value = None;
             }
 
-            println!("cut ratio {:?}", self.value);
+            // println!("cut ratio {:?}", self.value);
 
             let logic_pos = to_screen.inverse().transform_pos(pos);
             let segment_pos = logic_pos.x / scale;

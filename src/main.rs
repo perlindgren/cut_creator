@@ -1,7 +1,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
 
+use std::fs::File;
 use std::io::prelude::*;
-use std::{ffi::OsStr, fs::File};
 
 use cut_creator::{
     config::Config,
@@ -10,6 +10,7 @@ use cut_creator::{
 };
 
 use egui::*;
+use log::trace;
 
 fn main() -> Result<(), eframe::Error> {
     env_logger::init(); // Log to stderr (if you run with `RUST_LOG=debug`).
@@ -24,7 +25,7 @@ fn main() -> Result<(), eframe::Error> {
     if let Ok(mut file) = File::open("config.json") {
         let mut json = String::new();
         file.read_to_string(&mut json).unwrap();
-        println!("json {}", json);
+        trace!("config json {}", json);
         app.config = serde_json::from_str(&json).unwrap();
     }
 
@@ -41,6 +42,12 @@ struct App {
     cur_cut: usize,
     /// config
     config: Config,
+    ///
+    allowed_to_close: bool,
+    ///
+    show_confirmation_dialog: bool,
+    /// status bottom
+    status: String,
 }
 
 // helper
@@ -58,12 +65,12 @@ fn load_wav(opt_cut: &mut Option<(Cut, Wav, WavData)>) {
         .set_directory("./audio/")
         .pick_file()
     {
-        println!("path {:?}", path);
+        trace!("path {:?}", path);
         if let Some(ext) = path.extension() {
-            println!("ext {:?}", ext);
+            trace!("ext {:?}", ext);
             match ext.to_str() {
                 Some("wav") => {
-                    println!("wav");
+                    trace!("load wav");
                     let (w, wd) = Wav::load(path.clone());
                     let mut cut = Cut::default();
                     cut.sample_path = Some(path);
@@ -71,13 +78,13 @@ fn load_wav(opt_cut: &mut Option<(Cut, Wav, WavData)>) {
                     *opt_cut = Some((cut, w, wd));
                 }
                 Some("cut") => {
-                    println!("cut");
+                    trace!("load cut");
                     if let Ok(mut file) = File::open(path) {
                         let mut json = String::new();
                         file.read_to_string(&mut json).unwrap();
-                        println!("json {}", json);
+                        trace!("json {}", json);
                         let cut: Cut = serde_json::from_str(&json).unwrap();
-                        println!("cut {:?}", cut);
+                        trace!("cut {:?}", cut);
 
                         if let Some(sample_path) = cut.sample_path.clone() {
                             let (w, wd) = Wav::load(sample_path);
@@ -94,10 +101,10 @@ fn load_wav(opt_cut: &mut Option<(Cut, Wav, WavData)>) {
 impl eframe::App for App {
     ///
     fn on_exit(&mut self, _gl: Option<&eframe::glow::Context>) {
-        println!("exit");
+        trace!("exit");
         // Serialize it to a JSON string.
         let json = serde_json::to_string(&self.config).unwrap();
-        println!("config {}", json);
+        trace!("json config {}", json);
 
         let mut file = File::create("config.json").unwrap();
         file.write_all(json.as_bytes()).unwrap();
@@ -105,12 +112,43 @@ impl eframe::App for App {
 
     ///
     fn on_close_event(&mut self) -> bool {
-        println!("close");
-        true
+        trace!("close");
+        if self.cuts.iter().any(|opt_cut| {
+            if let Some(cut) = opt_cut {
+                cut.0.needs_save
+            } else {
+                false
+            }
+        }) {
+            self.show_confirmation_dialog = true;
+            self.allowed_to_close
+        } else {
+            true
+        }
     }
 
     /// update
-    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+    fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
+        // close dialog
+
+        if self.show_confirmation_dialog {
+            // Show confirmation dialog:
+            egui::Window::new("You have unsaved cuts. Quit?")
+                .collapsible(false)
+                .resizable(false)
+                .show(ctx, |ui| {
+                    ui.horizontal(|ui| {
+                        if ui.button("Cancel").clicked() {
+                            self.show_confirmation_dialog = false;
+                        }
+
+                        if ui.button("Yes!").clicked() {
+                            self.allowed_to_close = true;
+                            frame.close();
+                        }
+                    });
+                });
+        }
         egui::CentralPanel::default().show(ctx, |_ui| {
             // left side panel
             egui::SidePanel::left("left_id").show(ctx, |ui| {
@@ -176,8 +214,8 @@ impl eframe::App for App {
                     // double click allows to load new sample
                     for (i, opt_cut) in self.cuts.iter_mut().enumerate() {
                         // let path = opt_cut.map_or("...".to_string(), |(_, p)| p.get_path());
-                        let path = if let Some((cut, _w, wd)) = opt_cut {
-                            format!("{}{}", wd.filename, if cut.needs_save { "*" } else { "" })
+                        let path = if let Some((cut, _w, _wd)) = opt_cut {
+                            format!("{}{}", cut.name(), if cut.needs_save { "*" } else { "" })
                         } else {
                             "...".to_string()
                         };
@@ -218,7 +256,7 @@ impl eframe::App for App {
                     if let Some((cut, wav, wav_data)) = &mut self.cuts[self.cur_cut] {
                         wav.ui_content_ctrl(ui, wav_data, self.cur_cut);
 
-                        cut.ui_content_settings(ui);
+                        cut.ui_content_settings(ui, &mut self.status);
                     }
                 });
             });
@@ -250,7 +288,7 @@ impl eframe::App for App {
                             .inner_margin(egui::Margin::same(0.0)),
                     )
                     .show(ctx, |ui| {
-                        ui.label("dummy bottom panel, let's see what to do with that");
+                        ui.label(&self.status);
                     });
 
                 // populate center panel only if some cuts are enabled
@@ -258,10 +296,12 @@ impl eframe::App for App {
                     let height = ui.available_height();
                     let _width = ui.available_width();
                     let cut_height = (height - 20.0 - nr_enabled as f32 * 10.0) / nr_enabled as f32;
-                    // println!(
-                    //     "nr enabled {} height {}, cut_height {}",
-                    //     nr_enabled, height, cut_height
-                    // );
+                    trace!(
+                        "nr enabled {} height {}, cut_height {}",
+                        nr_enabled,
+                        height,
+                        cut_height
+                    );
 
                     // right side panel with wav
                     egui::SidePanel::right("right")
