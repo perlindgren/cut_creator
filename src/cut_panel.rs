@@ -28,7 +28,7 @@ pub struct Knot {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Cut {
     /// path to the cut
-    path: PathBuf,
+    pub path: PathBuf,
 
     /// path to the sample
     pub sample_path: Option<PathBuf>,
@@ -128,7 +128,7 @@ impl Default for Cut {
         );
 
         Self {
-            path: PathBuf::from_str(".audio/cut.cut").unwrap(),
+            path: PathBuf::new(),
             sample_path: None,
             quantization: 16,
             bars: 2.0,

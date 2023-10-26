@@ -60,7 +60,7 @@ fn clear_cuts(enabled: &mut [bool; 10], i: usize) {
 }
 
 fn load_wav(opt_cut: &mut Option<(Cut, Wav, WavData)>) {
-    if let Some(path) = rfd::FileDialog::new()
+    if let Some(mut path) = rfd::FileDialog::new()
         .add_filter("wav", &["wav", "cut"])
         .set_directory("./audio/")
         .pick_file()
@@ -70,11 +70,14 @@ fn load_wav(opt_cut: &mut Option<(Cut, Wav, WavData)>) {
             trace!("ext {:?}", ext);
             match ext.to_str() {
                 Some("wav") => {
+                    // loading wav only, set the cut to default
                     trace!("load wav");
-                    let (w, wd) = Wav::load(path.clone());
+                    let (w, wd) = Wav::load_wav_data(path.clone());
                     let mut cut = Cut::default();
-                    cut.sample_path = Some(path);
-
+                    println!("path {}", path.display());
+                    cut.sample_path = Some(path.clone());
+                    path.set_extension("cut");
+                    cut.path = path;
                     *opt_cut = Some((cut, w, wd));
                 }
                 Some("cut") => {
@@ -87,7 +90,7 @@ fn load_wav(opt_cut: &mut Option<(Cut, Wav, WavData)>) {
                         trace!("cut {:?}", cut);
 
                         if let Some(sample_path) = cut.sample_path.clone() {
-                            let (w, wd) = Wav::load(sample_path);
+                            let (w, wd) = Wav::load_wav_data(sample_path);
                             *opt_cut = Some((cut, w, wd));
                         }
                     }

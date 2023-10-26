@@ -6,6 +6,8 @@ use serde::{Deserialize, Serialize};
 use std::{fs::File, path::PathBuf};
 use wav::{BitDepth, Header};
 
+use log::trace;
+
 pub struct WavData {
     _header: Header,
     _stereo: Vec<f32>,
@@ -26,14 +28,14 @@ pub struct Wav {
 
 impl Wav {
     /// load
-    pub fn load(path: PathBuf) -> (Self, WavData) {
+    pub fn load_wav_data(path: PathBuf) -> (Self, WavData) {
         let mut inp_file = File::open(&path).unwrap();
         let (_header, data) = wav::read(&mut inp_file).unwrap();
-        println!("header {:?}", _header);
+        trace!("header {:?}", _header);
 
         let _stereo = match data {
             BitDepth::ThirtyTwoFloat(v) => {
-                println!("len total{}", v.len());
+                trace!("len total{}", v.len());
                 v
             }
             _ => {
@@ -49,7 +51,7 @@ impl Wav {
             right.push(*v.next().unwrap())
         }
         let len = left.len();
-        println!("len samples{}", len);
+        trace!("len samples{}", len);
         let filename = path.file_stem().unwrap().to_str().unwrap().to_owned();
 
         (
