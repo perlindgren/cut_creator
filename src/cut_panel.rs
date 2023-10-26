@@ -218,44 +218,58 @@ impl Cut {
         }
     }
 
-    /// name
+    // name
     pub fn name(&self) -> String {
         self.path.file_name().map_or("<TBD>".to_string(), |path| {
             path.to_string_lossy().to_string()
         })
     }
 
-    /// load cut
-    fn _load_cut() -> Result<Self, ()> {
-        if let Some(path) = rfd::FileDialog::new()
-            .add_filter("cut", &["cut"])
-            .set_directory("./audio/")
-            .pick_file()
-        {
-            trace!("load cut path {:?}", path);
-        }
-        Err(())
-    }
+    // /// load cut
+    // fn _load_cut() -> Result<Self, ()> {
+    //     if let Some(path) = rfd::FileDialog::new()
+    //         .add_filter("cut", &["cut"])
+    //         .set_directory("./audio/")
+    //         .pick_file()
+    //     {
+    //         trace!("load cut path {:?}", path);
+    //     }
+    //     Err(())
+    // }
 
     /// call to update spline when knots are changed
     pub fn update(&mut self) {
+        // add a knot to the spline
+        #[inline(always)]
+        fn key(knot: &Knot) -> splines::Key<f32, f32> {
+            splines::Key::new(knot.pos.x, knot.pos.y, Interpolation::CatmullRom)
+        }
         trace!("update knots and spline");
         self.needs_save = true;
         let len = self.knots.len();
         // ensure that endpoints are aligned
         self.knots[0].pos.y = self.knots[1].pos.y;
+        self.knots[len - 1].pos.y = self.knots[len - 2].pos.y;
 
+        // add knots besides last two
+        self.spline = Spline::from_iter(self.knots[..len - 2].iter().map(|k| key(k)));
+
+        // add last two knots
         if self.looping {
-            self.knots[len - 2].pos.y = self.knots[0].pos.y;
-            self.knots[len - 1].pos.y = self.knots[len - 2].pos.y;
+            self.spline.add(splines::Key::new(
+                self.knots[len - 2].pos.x,
+                self.knots[0].pos.y,
+                Interpolation::CatmullRom,
+            ));
+            self.spline.add(splines::Key::new(
+                self.knots[len - 1].pos.x,
+                self.knots[0].pos.y,
+                Interpolation::CatmullRom,
+            ));
         } else {
-            self.knots[len - 1].pos.y = self.knots[len - 2].pos.y;
+            self.spline.add(key(&self.knots[len - 2]));
+            self.spline.add(key(&self.knots[len - 1]));
         }
-        self.spline = Spline::from_iter(
-            self.knots
-                .iter()
-                .map(|k| splines::Key::new(k.pos.x, k.pos.y, Interpolation::CatmullRom)),
-        );
     }
 
     /// get the cursor position
@@ -508,8 +522,11 @@ impl Cut {
 
         let control_point_radius = 8.0;
         // knots
-        let control_point_shapes: Vec<Shape> = self
-            .knots
+        let control_point_shapes: Vec<Shape> = self.knots[1..if self.looping {
+            cp.len() - 2
+        } else {
+            cp.len() - 1
+        }]
             .iter_mut()
             .enumerate()
             .map(|(i, k)| {
@@ -529,9 +546,9 @@ impl Cut {
 
                 let point_response = ui.interact(point_rect, point_id, Sense::drag());
 
-                if point_response.drag_released() {
-                    println!("released");
-                }
+                // if point_response.drag_released() {
+                //     println!("released");
+                // }
 
                 if point_response.dragged() {
                     let pos = point_response.interact_pointer_pos().unwrap();
@@ -542,15 +559,15 @@ impl Cut {
                     println!("rounded {:?}", knot_pos.x);
 
                     // never move first 2 and last 2 knots in x direction
-                    if i > 1 && i < cp.len() - 2 {
+                    if i > 0 && i < cp.len() - 3 {
                         if knot_pos.x > k.pos.x {
                             // right
-                            if knot_pos.x < cp[i + 1].pos.x {
+                            if knot_pos.x < cp[i + 2].pos.x {
                                 k.pos.x = knot_pos.x;
                             }
                         } else if knot_pos.x < k.pos.x {
                             // left
-                            if knot_pos.x > cp[i - 1].pos.x {
+                            if knot_pos.x > cp[i].pos.x {
                                 k.pos.x = knot_pos.x;
                             }
                         }
