@@ -422,7 +422,7 @@ impl Cut {
 
         // delete knot
         if ui.input(|i| i.key_pressed(egui::Key::Delete)) {
-            println!("delete");
+            trace!("delete");
             let mut index = 0;
             let len = self.knots.len();
 
@@ -439,7 +439,7 @@ impl Cut {
         if ui.input(|i| i.key_pressed(egui::Key::Escape))
             || response.double_clicked_by(PointerButton::Secondary)
         {
-            println!("escape");
+            trace!("escape");
             for k in self.knots.iter_mut() {
                 k.selected = false;
             }
@@ -447,7 +447,7 @@ impl Cut {
 
         if response.drag_started_by(PointerButton::Secondary) {
             let pos = response.interact_pointer_pos().unwrap();
-            println!("select start {:?}", pos);
+            trace!("select start {:?}", pos);
             self.select_start = pos;
             self.select_end = pos;
             self.select_drag = true;
@@ -455,7 +455,7 @@ impl Cut {
 
         if response.drag_released_by(PointerButton::Secondary) {
             let pos = response.interact_pointer_pos().unwrap();
-            println!("select end {:?} ", pos);
+            trace!("select end {:?} ", pos);
             let rect = Rect::from_two_pos(self.select_start, self.select_end);
 
             self.knots.iter_mut().for_each(|k| {
@@ -470,7 +470,7 @@ impl Cut {
 
         if response.dragged_by(PointerButton::Secondary) {
             let pos = response.interact_pointer_pos().unwrap();
-            println!("select changed {:?}", pos);
+            trace!("select changed {:?}", pos);
 
             self.select_end = pos;
         }
@@ -491,12 +491,12 @@ impl Cut {
             self.move_start = response.interact_pointer_pos().unwrap();
             self.move_last = self.move_start;
             self.move_knots = self.knots.iter().map(|k| k.pos).collect();
-            println!("start move {:?}", self.move_start);
+            trace!("start move {:?}", self.move_start);
         }
 
         if response.drag_released_by(PointerButton::Primary) {
             self.move_drag = true;
-            println!("end move");
+            trace!("end move");
             self.move_drag = false;
         }
 
@@ -509,10 +509,10 @@ impl Cut {
             let rel = scr_pos - self.move_start;
             let bar_rel = bars_to_screen.inverse().scale() * rel;
 
-            println!("rel {:?}, k rel {:?}", rel, bar_rel);
+            trace!("rel {:?}, k rel {:?}", rel, bar_rel);
 
             if delta.x > 0.0 {
-                println!("right");
+                trace!("right");
                 // right. we have to update rightmost knot first
                 // exclude first 2 and last 2 knots, they have fixed x positions
                 for i in (2..cp.len() - 2).rev() {
@@ -530,7 +530,7 @@ impl Cut {
                     }
                 }
             } else if delta.x < 0.0 {
-                println!("left");
+                trace!("left");
                 // left we update leftmost knot first
                 // we exclude first 2 and last 2 knots, they have fixed positions
                 for i in 2..cp.len() - 2 {
@@ -550,9 +550,9 @@ impl Cut {
                     }
                 }
             }
-            println!("none");
+
             // left or up/down, we update leftmost knot first
-            for i in 0..cp.len() {
+            for i in 1..cp.len() - 1 {
                 if self.knots[i].selected {
                     println!("i {} ", i);
                     self.knots[i].pos.y = (self.move_knots[i].y + bar_rel.y).min(1.0).max(0.0);
