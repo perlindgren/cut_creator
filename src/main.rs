@@ -169,6 +169,7 @@ impl eframe::App for App {
                     // consecutive click to select cut as active
                     // shift click to multi select cuts
                     // double click allows to load new sample
+
                     for (i, opt_cut) in self.cuts.iter_mut().enumerate() {
                         let path = if let Some(cut) = opt_cut {
                             format!("{}{}", cut.name(), if cut.needs_save { "*" } else { "" })
@@ -189,23 +190,35 @@ impl eframe::App for App {
                             self.enabled[i] ^= true;
                         }
 
-                        ui.input(|is| {
-                            if is.key_pressed(Key::Enter) && i == self.cur_cut {
-                                self.enabled[i] ^= true;
-                            }
-                        });
-
-                        // load cut
-                        if button.double_clicked() || (self.enabled[i] && opt_cut.is_none()) {
-                            match Cut::load_wav() {
-                                Ok(cut) => *opt_cut = Some(cut),
-                                Err(err) => self.status = err,
+                        if button.double_clicked() {
+                            self.status = match Cut::load_wav() {
+                                Ok(cut) => {
+                                    *opt_cut = Some(cut);
+                                    "File loaded".to_string()
+                                }
+                                Err(err) => err,
                             }
                         }
 
                         if self.cur_cut == i {
                             button.highlight();
                         };
+                    }
+
+                    ui.input(|is| {
+                        if is.key_pressed(Key::Enter) {
+                            self.enabled[self.cur_cut] ^= true;
+                        }
+                    });
+
+                    if ui.input_mut(|i| i.consume_key(Modifiers::CTRL, Key::O)) {
+                        self.status = match Cut::load_wav() {
+                            Ok(cut) => {
+                                self.cuts[self.cur_cut] = Some(cut);
+                                "File loaded".to_string()
+                            }
+                            Err(err) => err,
+                        }
                     }
 
                     ui.separator();
