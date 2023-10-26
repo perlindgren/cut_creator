@@ -45,6 +45,9 @@ pub struct Cut {
     /// The control points.
     knots: Vec<Knot>,
 
+    /// Fader
+    fader: Vec<bool>,
+
     /// Looping, the end point equates the start point
     looping: bool,
 
@@ -137,12 +140,16 @@ impl Default for Cut {
                 .map(|k| splines::Key::new(k.pos.x, k.pos.y, Interpolation::CatmullRom)),
         );
 
+        let bars = 2.0;
+        let quantization = 16;
+
         Self {
             path: PathBuf::new(),
             sample_path: None,
-            quantization: 16,
-            bars: 2.0,
+            quantization,
+            bars,
             knots,
+            fader: vec![false; bars as usize * quantization as usize],
             spline,
             wav: Wav::default(),
             wav_data: WavData::default(),
@@ -372,6 +379,39 @@ impl Cut {
         );
 
         let bars_to_screen = emath::RectTransform::from_to(bars_rect, response.rect);
+
+        // draw fader
+        // pos in bars
+        // on, true for volume
+        if response.clicked_by(PointerButton::Middle) {
+            let pos = to_screen
+                .inverse()
+                .transform_pos(response.interact_pointer_pos().unwrap());
+            let index = (pos.x / scale) as usize;
+            println!("pos {:?}, in segs {:?}", pos, index);
+            self.fader[(pos.x / scale) as usize] ^= true;
+        }
+
+        let mut fader = vec![to_screen * Pos2::new(0.0, height)];
+        self.fader.iter().enumerate().for_each(|(i, on)| {
+            fader.push(
+                to_screen
+                    * Pos2::new(
+                        i as f32 * scale,
+                        height - if *on { config.fader_height } else { 0.0 },
+                    ),
+            );
+            fader.push(
+                to_screen
+                    * Pos2::new(
+                        (i + 1) as f32 * scale,
+                        height - if *on { config.fader_height } else { 0.0 },
+                    ),
+            )
+        });
+        fader.push(to_screen * Pos2::new(width, height));
+
+        painter.add(Shape::line(fader, config.stroke_fader));
 
         let mut clicked = response.clicked();
         let mut update = false;
