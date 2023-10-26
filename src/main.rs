@@ -3,11 +3,7 @@
 use std::fs::File;
 use std::io::prelude::*;
 
-use cut_creator::{
-    config::Config,
-    cut_panel::Cut,
-    wav_panel::{Wav, WavData},
-};
+use cut_creator::{config::Config, cut_panel::Cut};
 
 use egui::*;
 use log::trace;
@@ -37,7 +33,7 @@ struct App {
     ///
     enabled: [bool; 10],
     /// we have 10 save slots
-    cuts: [Option<(Cut, Wav, WavData)>; 10],
+    cuts: [Option<Cut>; 10],
     /// index of selected cut
     cur_cut: usize,
     /// config
@@ -59,48 +55,6 @@ fn clear_cuts(enabled: &mut [bool; 10], i: usize) {
     }
 }
 
-fn load_wav(opt_cut: &mut Option<(Cut, Wav, WavData)>) {
-    if let Some(mut path) = rfd::FileDialog::new()
-        .add_filter("wav", &["wav", "cut"])
-        .set_directory("./audio/")
-        .pick_file()
-    {
-        trace!("path {:?}", path);
-        if let Some(ext) = path.extension() {
-            trace!("ext {:?}", ext);
-            match ext.to_str() {
-                Some("wav") => {
-                    // loading wav only, set the cut to default
-                    trace!("load wav");
-                    let (w, wd) = Wav::load_wav_data(path.clone());
-                    let mut cut = Cut::default();
-                    println!("path {}", path.display());
-                    cut.sample_path = Some(path.clone());
-                    path.set_extension("cut");
-                    cut.path = path;
-                    *opt_cut = Some((cut, w, wd));
-                }
-                Some("cut") => {
-                    trace!("load cut");
-                    if let Ok(mut file) = File::open(path) {
-                        let mut json = String::new();
-                        file.read_to_string(&mut json).unwrap();
-                        trace!("json {}", json);
-                        let cut: Cut = serde_json::from_str(&json).unwrap();
-                        trace!("cut {:?}", cut);
-
-                        if let Some(sample_path) = cut.sample_path.clone() {
-                            let (w, wd) = Wav::load_wav_data(sample_path);
-                            *opt_cut = Some((cut, w, wd));
-                        }
-                    }
-                }
-                _ => {}
-            };
-        }
-    }
-}
-
 impl eframe::App for App {
     ///
     fn on_exit(&mut self, _gl: Option<&eframe::glow::Context>) {
@@ -118,7 +72,7 @@ impl eframe::App for App {
         trace!("close");
         if self.cuts.iter().any(|opt_cut| {
             if let Some(cut) = opt_cut {
-                cut.0.needs_save
+                cut.needs_save
             } else {
                 false
             }
@@ -216,8 +170,7 @@ impl eframe::App for App {
                     // shift click to multi select cuts
                     // double click allows to load new sample
                     for (i, opt_cut) in self.cuts.iter_mut().enumerate() {
-                        // let path = opt_cut.map_or("...".to_string(), |(_, p)| p.get_path());
-                        let path = if let Some((cut, _w, _wd)) = opt_cut {
+                        let path = if let Some(cut) = opt_cut {
                             format!("{}{}", cut.name(), if cut.needs_save { "*" } else { "" })
                         } else {
                             "...".to_string()
@@ -244,7 +197,10 @@ impl eframe::App for App {
 
                         // load cut
                         if button.double_clicked() || (self.enabled[i] && opt_cut.is_none()) {
-                            load_wav(opt_cut);
+                            match Cut::load_wav() {
+                                Ok(cut) => *opt_cut = Some(cut),
+                                Err(err) => self.status = err,
+                            }
                         }
 
                         if self.cur_cut == i {
@@ -256,8 +212,8 @@ impl eframe::App for App {
                     ui.label("Cut Settings");
                     ui.add_space(10.0);
 
-                    if let Some((cut, wav, wav_data)) = &mut self.cuts[self.cur_cut] {
-                        wav.ui_content_ctrl(ui, wav_data, self.cur_cut);
+                    if let Some(cut) = &mut self.cuts[self.cur_cut] {
+                        cut.wav.ui_content_ctrl(ui, &cut.wav_data, self.cur_cut);
 
                         cut.ui_content_settings(ui, &mut self.status);
                     }
@@ -316,17 +272,19 @@ impl eframe::App for App {
                         .show(ctx, |ui| {
                             // right wave panel
                             for (i, enabled) in self.enabled.iter().enumerate() {
-                                let opt_cut = self.cuts.get_mut(i).unwrap();
+                                let opt_cut = &mut self.cuts[i];
+
                                 if *enabled {
                                     egui::Frame::canvas(ui.style())
                                         .outer_margin(egui::Margin::same(3.0))
                                         .inner_margin(egui::Margin::same(0.0))
                                         .show(ui, |ui| {
-                                            if let Some((cut, wav, wav_data)) = opt_cut {
-                                                wav.ui_content(
+                                            if let Some(cut) = opt_cut {
+                                                cut.wav.ui_content(
                                                     ui,
-                                                    cut,
-                                                    wav_data,
+                                                    cut.get_cursor(),
+                                                    cut.get_value(),
+                                                    &cut.wav_data,
                                                     &self.config,
                                                     cut_height,
                                                 );
@@ -352,7 +310,7 @@ impl eframe::App for App {
                                         .outer_margin(egui::Margin::same(3.0))
                                         .inner_margin(egui::Margin::same(0.0))
                                         .show(ui, |ui| {
-                                            if let Some((cut, _wav, _wav_data)) = opt_cut {
+                                            if let Some(cut) = opt_cut {
                                                 cut.ui_content(ui, &self.config, cut_height);
                                             }
                                         });

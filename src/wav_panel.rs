@@ -1,4 +1,4 @@
-use crate::{config::Config, cut_panel::Cut};
+use crate::config::Config;
 use egui::epaint::PathShape;
 use egui::*;
 use serde::{Deserialize, Serialize};
@@ -8,27 +8,21 @@ use wav::{BitDepth, Header};
 
 use log::trace;
 
+#[derive(Default, Debug)]
 pub struct WavData {
     _header: Header,
     _stereo: Vec<f32>,
     left: Vec<f32>,
     right: Vec<f32>,
     /// the max length
-    len: usize,
+    pub len: usize,
     /// filename
     pub filename: String,
 }
 
-#[derive(Serialize, Deserialize)]
-pub struct Wav {
-    path: PathBuf,
-    offset: usize, // in samples, wrapping
-    len: usize,    // in samples
-}
-
-impl Wav {
+impl WavData {
     /// load
-    pub fn load_wav_data(path: PathBuf) -> (Self, WavData) {
+    pub fn load_wav_data(path: PathBuf) -> Self {
         let mut inp_file = File::open(&path).unwrap();
         let (_header, data) = wav::read(&mut inp_file).unwrap();
         trace!("header {:?}", _header);
@@ -54,32 +48,28 @@ impl Wav {
         trace!("len samples{}", len);
         let filename = path.file_stem().unwrap().to_str().unwrap().to_owned();
 
-        (
-            Wav {
-                path,
-                offset: 0,
-                len,
-            },
-            WavData {
-                _header,
-                _stereo,
-                left,
-                right,
-                len,
-                filename,
-            },
-        )
+        WavData {
+            _header,
+            _stereo,
+            left,
+            right,
+            len,
+            filename,
+        }
     }
+}
 
-    /// get path
-    pub fn get_path(&self) -> &PathBuf {
-        &self.path
-    }
+#[derive(Serialize, Deserialize, Debug, Default)]
+pub struct Wav {
+    offset: usize,  // in samples, wrapping
+    pub len: usize, // in samples
+}
 
+impl Wav {
     /// control panel
     pub fn ui_content_ctrl(&mut self, ui: &mut Ui, wav_data: &WavData, i: usize) {
         ui.label(format!("#{}: {}", i, wav_data.filename));
-        ui.label(format!("{}", self.path.display()));
+        // ui.label(format!("{}", self.path.display()));
 
         ui.horizontal(|ui| {
             if ui.button("X").clicked() {
@@ -100,7 +90,8 @@ impl Wav {
     pub fn ui_content(
         &mut self,
         ui: &mut Ui,
-        cut: &Cut,
+        cut_cursor: Option<Pos2>,
+        cut_value: Option<f32>,
         wav_data: &WavData,
         config: &Config,
         height: f32,
@@ -171,7 +162,7 @@ impl Wav {
         painter.add(PathShape::line(right, config.stroke_sample));
 
         // paint cursor line
-        if let Some(cursor) = cut.get_cursor() {
+        if let Some(cursor) = cut_cursor {
             painter.add(PathShape::line(
                 vec![
                     Pos2 {
@@ -188,7 +179,7 @@ impl Wav {
         }
 
         // paint value
-        if let Some(value) = cut.get_value() {
+        if let Some(value) = cut_value {
             painter.add(PathShape::line(
                 vec![
                     to_screen

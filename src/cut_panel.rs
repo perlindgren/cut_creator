@@ -1,11 +1,14 @@
-use crate::config::Config;
+use crate::{
+    config::Config,
+    wav_panel::{Wav, WavData},
+};
 use egui::epaint::PathShape;
 use egui::*;
 use epaint::RectShape;
 use splines::{Interpolation, Spline};
 
 use serde::{Deserialize, Serialize};
-use std::{fs::File, io::prelude::*, path::PathBuf, str::FromStr};
+use std::{fs::File, io::prelude::*, path::PathBuf};
 
 use log::trace;
 /// cut_panel
@@ -52,11 +55,18 @@ pub struct Cut {
     // TODO, should this be #[serde(Skip)]? (Default impl required)
     spline: Spline<f32, f32>,
 
+    /// Wav
+    pub wav: Wav,
+
     /// Run-time only data
 
     /// Needs save
     #[serde(skip)]
     pub needs_save: bool,
+
+    /// Wav Data
+    #[serde(skip)]
+    pub wav_data: WavData,
 
     /// Select rect
     #[serde(skip)]
@@ -134,6 +144,8 @@ impl Default for Cut {
             bars: 2.0,
             knots,
             spline,
+            wav: Wav::default(),
+            wav_data: WavData::default(),
 
             // Non persistent data
             needs_save: false,
@@ -153,6 +165,59 @@ impl Default for Cut {
 }
 
 impl Cut {
+    pub fn load_wav() -> Result<Cut, String> {
+        match rfd::FileDialog::new()
+            .add_filter("wav", &["wav", "cut"])
+            .set_directory("./audio/")
+            .pick_file()
+        {
+            Some(mut path) => {
+                trace!("path {:?}", path);
+
+                match path.extension() {
+                    Some(ext) => {
+                        trace!("ext {:?}", ext);
+                        match ext.to_str() {
+                            Some("wav") => {
+                                // loading wav only, set the cut to default
+                                trace!("load wav");
+                                let mut cut = Cut::default();
+                                cut.wav_data = WavData::load_wav_data(path.clone());
+                                cut.wav.len = cut.wav_data.len;
+                                println!("path {}", path.display());
+                                cut.sample_path = Some(path.clone());
+                                path.set_extension("cut");
+                                cut.path = path;
+                                Ok(cut)
+                            }
+                            Some("cut") => {
+                                trace!("load cut");
+                                if let Ok(mut file) = File::open(path) {
+                                    let mut json = String::new();
+                                    file.read_to_string(&mut json).unwrap();
+                                    trace!("json {}", json);
+                                    let mut cut: Cut = serde_json::from_str(&json).unwrap();
+                                    trace!("cut {:?}", cut);
+
+                                    if let Some(sample_path) = cut.sample_path.clone() {
+                                        cut.wav_data = WavData::load_wav_data(sample_path);
+                                    }
+                                    Ok(cut)
+                                } else {
+                                    Err("Could not load file".to_string())
+                                }
+                            }
+
+                            _ => Err("Filetype not supported".to_string()),
+                        }
+                    }
+                    _ => Err("Filetype not supported".to_string()),
+                }
+            }
+            None => Err("Load cancelled".to_string()),
+        }
+    }
+
     /// name
     pub fn name(&self) -> String {
         self.path.file_name().map_or("<TBD>".to_string(), |path| {
@@ -244,7 +309,7 @@ impl Cut {
         }
     }
 
-    /// settings
+    /// Cut Settings
     pub fn ui_content_settings(&mut self, ui: &mut Ui, status: &mut String) {
         if ui.checkbox(&mut self.looping, "looping").clicked()
             || ui.checkbox(&mut self.warping, "warping").clicked()
