@@ -13,6 +13,7 @@ fn main() -> Result<(), eframe::Error> {
 
     let options = eframe::NativeOptions {
         initial_window_size: Some(egui::vec2(1000.0, 500.0)),
+        min_window_size: Some(Vec2::new(400.0, 200.0)),
         ..Default::default()
     };
 
@@ -59,14 +60,14 @@ impl App {
             Err(err) => err,
         };
     }
-}
 
-// helper
-fn clear_cuts(enabled: &mut [bool; 10], i: usize) {
-    for (index, enable) in enabled.iter_mut().enumerate() {
-        if index != i {
-            *enable = false
-        };
+    /// clear all cuts but i
+    fn clear_cuts(&mut self, i: usize) {
+        for (index, enable) in self.enabled.iter_mut().enumerate() {
+            if index != i {
+                *enable = false
+            };
+        }
     }
 }
 
@@ -104,7 +105,8 @@ impl eframe::App for App {
         // close dialog
         if self.show_confirmation_dialog {
             // Show confirmation dialog:
-            egui::Window::new("You have unsaved cuts. Quit?")
+            egui::Window::new("You have unsaved cuts")
+                .anchor(Align2::CENTER_CENTER, [0., 0.])
                 .collapsible(false)
                 .resizable(false)
                 .show(ctx, |ui| {
@@ -113,7 +115,7 @@ impl eframe::App for App {
                             self.show_confirmation_dialog = false;
                         }
 
-                        if ui.button("Yes!").clicked() {
+                        if ui.button("Quit").clicked() {
                             self.allowed_to_close = true;
                             frame.close();
                         }
@@ -174,7 +176,7 @@ impl eframe::App for App {
 
                     // clear all selected
                     if ui.button("Clear all selected cuts").clicked() {
-                        clear_cuts(&mut self.enabled, 10);
+                        self.clear_cuts(10);
                     }
 
                     // enabling/disabling cuts
