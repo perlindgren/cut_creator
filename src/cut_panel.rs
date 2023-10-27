@@ -237,18 +237,6 @@ impl Cut {
             })
     }
 
-    // /// load cut
-    // fn _load_cut() -> Result<Self, ()> {
-    //     if let Some(path) = rfd::FileDialog::new()
-    //         .add_filter("cut", &["cut"])
-    //         .set_directory("./audio/")
-    //         .pick_file()
-    //     {
-    //         trace!("load cut path {:?}", path);
-    //     }
-    //     Err(())
-    // }
-
     /// call to update spline when knots are changed
     pub fn update(&mut self) {
         // add a knot to the spline

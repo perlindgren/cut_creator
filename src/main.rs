@@ -46,6 +46,21 @@ struct App {
     status: String,
 }
 
+impl App {
+    /// load file
+    fn load_file(&mut self, i: usize) {
+        self.status = match Cut::load_file() {
+            Ok(cut) => {
+                let path = cut.cut_path.clone();
+                self.cuts[self.cur_cut] = Some(cut);
+                self.enabled[i] = true;
+                format!("File loaded {}", path.to_string_lossy())
+            }
+            Err(err) => err,
+        };
+    }
+}
+
 // helper
 fn clear_cuts(enabled: &mut [bool; 10], i: usize) {
     for (index, enable) in enabled.iter_mut().enumerate() {
@@ -169,6 +184,8 @@ impl eframe::App for App {
                     // shift click to multi select cuts
                     // double click allows to load new sample
 
+                    let mut opt_load_file: Option<usize> = None;
+
                     for (i, opt_cut) in self.cuts.iter_mut().enumerate() {
                         let path = if let Some(cut) = opt_cut {
                             format!("{}{}", cut.name(), if cut.needs_save { "*" } else { "" })
@@ -190,13 +207,7 @@ impl eframe::App for App {
                         }
 
                         if button.double_clicked() {
-                            self.status = match Cut::load_file() {
-                                Ok(cut) => {
-                                    *opt_cut = Some(cut);
-                                    "File loaded".to_string()
-                                }
-                                Err(err) => err,
-                            }
+                            opt_load_file = Some(i)
                         }
 
                         if self.cur_cut == i {
@@ -211,14 +222,11 @@ impl eframe::App for App {
                     });
 
                     if ui.input_mut(|i| i.consume_key(Modifiers::CTRL, Key::O)) {
-                        self.status = match Cut::load_file() {
-                            Ok(cut) => {
-                                let path = cut.cut_path.clone();
-                                self.cuts[self.cur_cut] = Some(cut);
-                                format!("File loaded {}", path.to_string_lossy())
-                            }
-                            Err(err) => err,
-                        }
+                        opt_load_file = Some(self.cur_cut);
+                    }
+
+                    if let Some(i) = opt_load_file {
+                        self.load_file(i);
                     }
 
                     ui.separator();
