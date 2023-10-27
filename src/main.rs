@@ -105,15 +105,17 @@ impl eframe::App for App {
         // close dialog
         if self.show_confirmation_dialog {
             // Show confirmation dialog:
-            egui::Window::new("You have unsaved cuts")
+            egui::Window::new("You have unsaved cuts!")
                 .anchor(Align2::CENTER_CENTER, [0., 0.])
                 .collapsible(false)
                 .resizable(false)
                 .show(ctx, |ui| {
                     ui.horizontal(|ui| {
+                        ui.add_space(25.0);
                         if ui.button("Cancel").clicked() {
                             self.show_confirmation_dialog = false;
                         }
+                        ui.add_space(40.0);
 
                         if ui.button("Quit").clicked() {
                             self.allowed_to_close = true;
