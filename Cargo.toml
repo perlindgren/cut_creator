@@ -22,3 +22,6 @@ wav = "1.0.0"
 
 [profile.dev]
 overflow-checks = false
+
+[patch.crates-io]
+splines = { path = "../splines" }

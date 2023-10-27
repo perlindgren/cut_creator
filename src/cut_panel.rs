@@ -43,10 +43,10 @@ pub struct Cut {
     bars: f32,
 
     /// The control points.
-    knots: Vec<Knot>,
+    cut_knots: Vec<Knot>,
 
     /// Fader
-    fader: Vec<bool>,
+    fader_knots: Vec<Knot>,
 
     /// Looping, the end point equates the start point
     looping: bool,
@@ -54,14 +54,18 @@ pub struct Cut {
     /// Warping, the samples will warp across start/end
     warping: bool,
 
-    /// Spline
-    // TODO, should this be #[serde(Skip)]? (Default impl required)
-    spline: Spline<f32, f32>,
-
     /// Wav
     pub wav: Wav,
 
     /// Run-time only data
+
+    /// Cut Spline
+    #[serde(skip)]
+    cut_spline: Spline<f32, f32>,
+
+    /// Fader Spline
+    #[serde(skip)]
+    fader_spline: Spline<f32, f32>,
 
     /// Needs save
     #[serde(skip)]
@@ -110,7 +114,7 @@ pub struct Cut {
 
 impl Default for Cut {
     fn default() -> Self {
-        let knots = vec![
+        let cut_knots = vec![
             // start top left
             Knot {
                 pos: pos2(-0.25, 0.0),
@@ -134,10 +138,51 @@ impl Default for Cut {
                 selected: false,
             },
         ];
-        let spline = Spline::from_iter(
-            knots
+        let cut_spline = Spline::from_iter(
+            cut_knots
                 .iter()
                 .map(|k| splines::Key::new(k.pos.x, k.pos.y, Interpolation::CatmullRom)),
+        );
+
+        let fader_knots = vec![
+            Knot {
+                pos: pos2(-0.25, 0.0),
+                selected: false,
+            },
+            Knot {
+                pos: pos2(0.0, 0.0),
+                selected: false,
+            },
+            Knot {
+                pos: pos2(1.0, 0.0),
+                selected: false,
+            },
+            Knot {
+                pos: pos2(1.0, 1.0),
+                selected: false,
+            },
+            Knot {
+                pos: pos2(1.5, 1.0),
+                selected: false,
+            },
+            Knot {
+                pos: pos2(1.5, 0.0),
+                selected: false,
+            },
+            Knot {
+                pos: pos2(2.0, 0.0),
+                selected: false,
+            },
+            Knot {
+                pos: pos2(2.25, 0.0),
+                selected: false,
+            },
+        ];
+
+        let fader_spline = Spline::from_iter(
+            fader_knots
+                .iter()
+                .map(|k| splines::Key::new(k.pos.x, k.pos.y, Interpolation::Linear)),
         );
 
         let bars = 2.0;
@@ -148,9 +193,10 @@ impl Default for Cut {
             sample_path: None,
             quantization,
             bars,
-            knots,
-            fader: vec![false; bars as usize * quantization as usize],
-            spline,
+            cut_knots,
+            fader_knots,
+            cut_spline,
+            fader_spline,
             wav: Wav::default(),
             wav_data: WavData::default(),
 
@@ -172,6 +218,7 @@ impl Default for Cut {
 }
 
 impl Cut {
+    // load file
     pub fn load_file() -> Result<Cut, String> {
         match rfd::FileDialog::new()
             .add_filter("wav", &["wav", "cut"])
@@ -212,6 +259,9 @@ impl Cut {
                                     if let Some(sample_path) = cut.sample_path.clone() {
                                         cut.wav_data = WavData::load_wav_data(sample_path)?;
                                     }
+                                    cut.cut_spline_update();
+                                    cut.fader_spline_update();
+
                                     Ok(cut)
                                 } else {
                                     Err("Could not load file".to_string())
@@ -237,8 +287,8 @@ impl Cut {
             })
     }
 
-    /// call to update spline when knots are changed
-    pub fn update(&mut self) {
+    /// call to update cut spline when knots are changed
+    pub fn cut_spline_update(&mut self) {
         // add a knot to the spline
         #[inline(always)]
         fn key(knot: &Knot) -> splines::Key<f32, f32> {
@@ -246,30 +296,39 @@ impl Cut {
         }
         trace!("update knots and spline");
         self.needs_save = true;
-        let len = self.knots.len();
+        let len = self.cut_knots.len();
         // ensure that endpoints are aligned
-        self.knots[0].pos.y = self.knots[1].pos.y;
-        self.knots[len - 1].pos.y = self.knots[len - 2].pos.y;
+        self.cut_knots[0].pos.y = self.cut_knots[1].pos.y;
+        self.cut_knots[len - 1].pos.y = self.cut_knots[len - 2].pos.y;
 
         // add knots besides last two
-        self.spline = Spline::from_iter(self.knots[..len - 2].iter().map(key));
+        self.cut_spline = Spline::from_iter(self.cut_knots[..len - 2].iter().map(key));
 
         // add last two knots
         if self.looping {
-            self.spline.add(splines::Key::new(
-                self.knots[len - 2].pos.x,
-                self.knots[0].pos.y,
+            self.cut_spline.add(splines::Key::new(
+                self.cut_knots[len - 2].pos.x,
+                self.cut_knots[0].pos.y,
                 Interpolation::CatmullRom,
             ));
-            self.spline.add(splines::Key::new(
-                self.knots[len - 1].pos.x,
-                self.knots[0].pos.y,
+            self.cut_spline.add(splines::Key::new(
+                self.cut_knots[len - 1].pos.x,
+                self.cut_knots[0].pos.y,
                 Interpolation::CatmullRom,
             ));
         } else {
-            self.spline.add(key(&self.knots[len - 2]));
-            self.spline.add(key(&self.knots[len - 1]));
+            self.cut_spline.add(key(&self.cut_knots[len - 2]));
+            self.cut_spline.add(key(&self.cut_knots[len - 1]));
         }
+    }
+
+    /// call to update spline when knots are changed
+    pub fn fader_spline_update(&mut self) {
+        self.fader_spline = Spline::from_iter(
+            self.fader_knots
+                .iter()
+                .map(|k| splines::Key::new(k.pos.x, k.pos.y, Interpolation::Linear)),
+        );
     }
 
     /// get the cursor position
@@ -328,7 +387,7 @@ impl Cut {
         if ui.checkbox(&mut self.looping, "looping").clicked()
             || ui.checkbox(&mut self.warping, "warping").clicked()
         {
-            self.update()
+            self.cut_spline_update()
         }
 
         if ui
@@ -376,34 +435,37 @@ impl Cut {
         // draw fader
         // pos in bars
         // on, true for volume
-        if response.clicked_by(PointerButton::Middle) {
-            let pos = to_screen
-                .inverse()
-                .transform_pos(response.interact_pointer_pos().unwrap());
-            let index = (pos.x / scale) as usize;
-            self.fader[index] ^= true;
-        }
+        // if response.clicked_by(PointerButton::Middle) {
+        //     let pos = to_screen
+        //         .inverse()
+        //         .transform_pos(response.interact_pointer_pos().unwrap());
+        //     let index = (pos.x / scale) as usize;
+        //     self.fader[index] ^= true;
+        // }
 
-        let mut fader = vec![to_screen * Pos2::new(0.0, height)];
-        self.fader.iter().enumerate().for_each(|(i, on)| {
-            fader.push(
-                to_screen
-                    * Pos2::new(
-                        i as f32 * scale,
-                        height - if *on { config.fader_height } else { 0.0 },
-                    ),
-            );
-            fader.push(
-                to_screen
-                    * Pos2::new(
-                        (i + 1) as f32 * scale,
-                        height - if *on { config.fader_height } else { 0.0 },
-                    ),
-            )
-        });
-        fader.push(to_screen * Pos2::new(width, height));
+        // let mut fader = vec![to_screen * Pos2::new(0.0, height)];
+        // self.fader.iter().enumerate().for_each(|(i, on)| {
+        //     fader.push(
+        //         to_screen
+        //             * Pos2::new(
+        //                 i as f32 * scale,
+        //                 height - if *on { config.fader_height } else { 0.0 },
+        //             ),
+        //     );
+        //     fader.push(
+        //         to_screen
+        //             * Pos2::new(
+        //                 (i + 1) as f32 * scale,
+        //                 height - if *on { config.fader_height } else { 0.0 },
+        //             ),
+        //     )
+        // });
+        // fader.push(to_screen * Pos2::new(width, height));
 
-        painter.add(Shape::line(fader, config.stroke_fader));
+        // add knots besides last two
+        // self.spline = Spline::from_iter(self.fader[..len - 2].iter().map(key))
+
+        // painter.add(Shape::line(fader, config.stroke_fader));
 
         let mut clicked = response.clicked();
         let mut update = false;
@@ -416,9 +478,9 @@ impl Cut {
         if ui.input(|i| i.key_pressed(egui::Key::Delete)) {
             trace!("delete");
             let mut index = 0;
-            let len = self.knots.len();
+            let len = self.cut_knots.len();
 
-            self.knots.retain(|k| {
+            self.cut_knots.retain(|k| {
                 index += 1;
                 !(k.selected && index > 2 && index < len - 1)
             });
@@ -432,7 +494,7 @@ impl Cut {
             || response.double_clicked_by(PointerButton::Secondary)
         {
             trace!("escape");
-            for k in self.knots.iter_mut() {
+            for k in self.cut_knots.iter_mut() {
                 k.selected = false;
             }
         }
@@ -450,7 +512,7 @@ impl Cut {
             trace!("select end {:?} ", pos);
             let rect = Rect::from_two_pos(self.select_start, self.select_end);
 
-            self.knots.iter_mut().for_each(|k| {
+            self.cut_knots.iter_mut().for_each(|k| {
                 if rect.contains(bars_to_screen * k.pos) {
                     k.selected ^= true;
                 }
@@ -476,13 +538,13 @@ impl Cut {
             )));
         }
 
-        let cp = self.knots.clone();
+        let cp = self.cut_knots.clone();
         // drag all knots
         if response.drag_started_by(PointerButton::Primary) {
             self.move_drag = true;
             self.move_start = response.interact_pointer_pos().unwrap();
             self.move_last = self.move_start;
-            self.move_knots = self.knots.iter().map(|k| k.pos).collect();
+            self.move_knots = self.cut_knots.iter().map(|k| k.pos).collect();
             trace!("start move {:?}", self.move_start);
         }
 
@@ -508,16 +570,16 @@ impl Cut {
                 // right. we have to update rightmost knot first
                 // exclude first 2 and last 2 knots, they have fixed x positions
                 for i in (2..cp.len() - 2).rev() {
-                    if self.knots[i].selected {
+                    if self.cut_knots[i].selected {
                         let knot_pos_x = ((self.move_knots[i].x + bar_rel.x)
                             * (self.quantization as f32))
                             .round()
                             / (self.quantization as f32);
 
-                        if knot_pos_x < self.knots[i + 1].pos.x
-                            && knot_pos_x > self.knots[i - 1].pos.x
+                        if knot_pos_x < self.cut_knots[i + 1].pos.x
+                            && knot_pos_x > self.cut_knots[i - 1].pos.x
                         {
-                            self.knots[i].pos.x = knot_pos_x;
+                            self.cut_knots[i].pos.x = knot_pos_x;
                         }
                     }
                 }
@@ -526,7 +588,7 @@ impl Cut {
                 // left we update leftmost knot first
                 // we exclude first 2 and last 2 knots, they have fixed positions
                 for i in 2..cp.len() - 2 {
-                    if self.knots[i].selected {
+                    if self.cut_knots[i].selected {
                         println!("i {} ", i);
 
                         let knot_pos_x = ((self.move_knots[i].x + bar_rel.x)
@@ -534,10 +596,10 @@ impl Cut {
                             .round()
                             / (self.quantization as f32);
 
-                        if knot_pos_x > self.knots[i - 1].pos.x
-                            && knot_pos_x < self.knots[i + 1].pos.x
+                        if knot_pos_x > self.cut_knots[i - 1].pos.x
+                            && knot_pos_x < self.cut_knots[i + 1].pos.x
                         {
-                            self.knots[i].pos.x = knot_pos_x;
+                            self.cut_knots[i].pos.x = knot_pos_x;
                         }
                     }
                 }
@@ -545,16 +607,16 @@ impl Cut {
 
             // left or up/down, we update leftmost knot first
             for i in 1..cp.len() - 1 {
-                if self.knots[i].selected {
+                if self.cut_knots[i].selected {
                     println!("i {} ", i);
-                    self.knots[i].pos.y = (self.move_knots[i].y + bar_rel.y).min(1.0).max(0.0);
+                    self.cut_knots[i].pos.y = (self.move_knots[i].y + bar_rel.y).min(1.0).max(0.0);
                 }
             }
         }
 
         let control_point_radius = 8.0;
         // knots
-        let control_point_shapes: Vec<Shape> = self.knots[1..if self.looping {
+        let control_point_shapes: Vec<Shape> = self.cut_knots[1..if self.looping {
             cp.len() - 2
         } else {
             cp.len() - 1
@@ -634,10 +696,10 @@ impl Cut {
             pos.x = round_x;
 
             // insert, or move
-            let cp = self.knots.clone().into_iter();
+            let cp = self.cut_knots.clone().into_iter();
 
             if self
-                .knots
+                .cut_knots
                 .iter_mut()
                 .find_map(|k| {
                     if k.pos.x == pos.x {
@@ -658,31 +720,37 @@ impl Cut {
                 });
                 tail.extend(head);
 
-                self.knots = tail;
+                self.cut_knots = tail;
 
-                println!("knots {:?}", self.knots);
+                println!("knots {:?}", self.cut_knots);
             }
             update = true;
         }
 
         if update {
-            self.update();
+            self.cut_spline_update();
         }
 
         // draw spline
-        let start = self.knots[1].pos.x; // to ensure we have two knots on either side
-        let end = self.knots[self.knots.len() - 2].pos.x;
+        let start = self.cut_knots[1].pos.x; // to ensure we have two knots on either side
+        let end = self.cut_knots[self.cut_knots.len() - 2].pos.x;
 
         let interval = end - start;
         let points = width / config.step_size as f32;
         let step = interval / points;
 
-        let mut v = vec![];
+        let mut cut_solid = vec![];
+        let mut cut_dashed = vec![];
+
+        let mut cuts_solid = vec![];
+        let mut cuts_dashed = vec![];
+
+        let mut fader_state = false;
 
         for i in 0..=points as usize {
             let t = i as f32 * step + start;
 
-            if let Some(y) = self.spline.sample(t) {
+            if let Some(y) = self.cut_spline.sample(t) {
                 let y = if self.warping {
                     if y > 1.0 {
                         y - 1.0
@@ -695,25 +763,73 @@ impl Cut {
                     y.max(0.0).min(1.0)
                 };
 
-                v.push(bars_to_screen * Pos2 { x: t, y })
+                let fader_y = self.fader_spline.sample(t).unwrap();
+                if fader_y == 0.0 {
+                    cut_solid.push(bars_to_screen * Pos2 { x: t, y });
+                    if fader_state {
+                        // change from high to low
+                        cut_dashed.push(bars_to_screen * Pos2 { x: t, y });
+                        cuts_dashed.push(cut_dashed);
+                        cut_dashed = vec![];
+                        fader_state = false;
+                    }
+                } else {
+                    cut_dashed.push(bars_to_screen * Pos2 { x: t, y });
+                    if !fader_state {
+                        // change from low to high
+                        cut_solid.push(bars_to_screen * Pos2 { x: t, y });
+                        cuts_solid.push(cut_solid);
+                        cut_solid = vec![];
+                        fader_state = true
+                    }
+                }
             }
         }
-        v.push(
-            bars_to_screen
-                * Pos2 {
-                    x: end,
-                    y: self.spline.sample(end - 0.000001).unwrap(),
-                },
-        );
+        if fader_state {
+            cut_solid.push(
+                bars_to_screen
+                    * Pos2 {
+                        x: end,
+                        y: self.cut_spline.sample(end - 0.000001).unwrap(),
+                    },
+            );
+        } else {
+            cut_dashed.push(
+                bars_to_screen
+                    * Pos2 {
+                        x: end,
+                        y: self.cut_spline.sample(end - 0.000001).unwrap(),
+                    },
+            );
+        }
+        cuts_solid.push(cut_solid);
+        cuts_dashed.push(cut_dashed);
 
-        painter.add(PathShape::line(v, config.stroke_spline));
+        cuts_dashed.iter().for_each(|c| {
+            painter.add(Shape::dashed_line(c, config.stroke_spline, 10.0, 10.0));
+        });
 
-        // draw connecting lines for spline
+        cuts_solid.iter().for_each(|c| {
+            painter.add(Shape::line(c.to_vec(), config.stroke_spline));
+        });
+
+        // draw connecting lines for cut spline
         if config.knot_line {
-            let points_in_screen: Vec<Pos2> =
-                self.knots.iter().map(|k| bars_to_screen * k.pos).collect();
+            let points_in_screen: Vec<Pos2> = self
+                .cut_knots
+                .iter()
+                .map(|k| bars_to_screen * k.pos)
+                .collect();
             painter.add(PathShape::line(points_in_screen, config.stroke_line));
         }
+
+        // draw connecting lines for fader
+        let points_in_screen: Vec<Pos2> = self
+            .fader_knots
+            .iter()
+            .map(|k| bars_to_screen * k.pos)
+            .collect();
+        painter.add(PathShape::line(points_in_screen, config.stroke_fader));
 
         // knots
         painter.extend(control_point_shapes);
@@ -726,7 +842,7 @@ impl Cut {
             self.cursor = Some(pos);
             let t = bars_to_screen.inverse().transform_pos(pos).x;
 
-            if let Some(y) = self.spline.sample(t) {
+            if let Some(y) = self.cut_spline.sample(t) {
                 let y = if self.warping {
                     if y > 1.0 {
                         y - 1.0
