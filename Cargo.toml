@@ -24,4 +24,6 @@ wav = "1.0.0"
 overflow-checks = false
 
 [patch.crates-io]
-splines = { path = "../splines" }
+# splines = { path = "../splines" }
+
+splines = { git = 'https://github.com/perlindgren/splines/' }
