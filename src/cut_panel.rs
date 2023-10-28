@@ -25,6 +25,9 @@ pub struct Knot {
     /// x position in terms of bars. 0.25 -> 1st quarter in 1st bar
     /// y position in terms of relative sample position 0.0 beginning of sample 1.0 end of sample.
     pos: Pos2,
+
+    /// Run-time only data
+    #[serde(skip)]
     selected: bool,
 }
 
@@ -455,12 +458,12 @@ impl Cut {
             println!("undo");
         }
 
-        // delete cut knot
+        // delete knots
         if ui.input(|i| i.key_pressed(egui::Key::Delete)) {
             trace!("delete");
+            // cut knots
             let mut index = 0;
             let len = self.cut_knots.len();
-
             self.cut_knots.retain(|k| {
                 index += 1;
                 if k.selected {
@@ -469,6 +472,7 @@ impl Cut {
                 !(k.selected && index > 2 && index < len - 1)
             });
 
+            // fader knots
             let mut index = 0;
             let len = self.fader_knots.len();
             self.fader_knots.retain(|k| {
@@ -503,13 +507,21 @@ impl Cut {
             trace!("select end {:?} ", pos);
             let rect = Rect::from_two_pos(self.select_start, self.select_end);
 
-            self.cut_knots.iter_mut().for_each(|k| {
-                if rect.contains(bars_to_screen * k.pos) {
-                    k.selected ^= true;
+            // cut knots
+            self.cut_knots.iter_mut().for_each(|cut_knot| {
+                if rect.contains(bars_to_screen * cut_knot.pos) {
+                    cut_knot.selected ^= true;
                 }
             });
 
-            cut_update = true;
+            // fader knots
+            self.fader_knots.iter_mut().for_each(|fader_knot| {
+                if rect.contains(bars_to_screen * fader_knot.pos) {
+                    fader_knot.selected ^= true;
+                }
+            });
+
+            // cut_update = true;
             self.select_drag = false;
         }
 
