@@ -444,41 +444,6 @@ impl Cut {
 
         let bars_to_screen = emath::RectTransform::from_to(bars_rect, response.rect);
 
-        // draw fader
-        // pos in bars
-        // on, true for volume
-        // if response.clicked_by(PointerButton::Middle) {
-        //     let pos = to_screen
-        //         .inverse()
-        //         .transform_pos(response.interact_pointer_pos().unwrap());
-        //     let index = (pos.x / scale) as usize;
-        //     self.fader[index] ^= true;
-        // }
-
-        // let mut fader = vec![to_screen * Pos2::new(0.0, height)];
-        // self.fader.iter().enumerate().for_each(|(i, on)| {
-        //     fader.push(
-        //         to_screen
-        //             * Pos2::new(
-        //                 i as f32 * scale,
-        //                 height - if *on { config.fader_height } else { 0.0 },
-        //             ),
-        //     );
-        //     fader.push(
-        //         to_screen
-        //             * Pos2::new(
-        //                 (i + 1) as f32 * scale,
-        //                 height - if *on { config.fader_height } else { 0.0 },
-        //             ),
-        //     )
-        // });
-        // fader.push(to_screen * Pos2::new(width, height));
-
-        // add knots besides last two
-        // self.spline = Spline::from_iter(self.fader[..len - 2].iter().map(key))
-
-        // painter.add(Shape::line(fader, config.stroke_fader));
-
         let mut primary_clicked = response.clicked_by(PointerButton::Primary);
         let mut _middle_clicked = response.clicked_by(PointerButton::Middle);
         let secondary_clicked = response.clicked_by(PointerButton::Secondary);
