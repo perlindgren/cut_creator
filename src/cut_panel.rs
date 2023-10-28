@@ -631,9 +631,9 @@ impl Cut {
 
                 let point_response = ui.interact(point_rect, point_id, Sense::drag());
 
-                // if point_response.drag_released() {
-                //     println!("released");
-                // }
+                if point_response.drag_released() {
+                    println!("released");
+                }
 
                 if point_response.dragged() {
                     let pos = point_response.interact_pointer_pos().unwrap();
@@ -791,6 +791,7 @@ impl Cut {
             cut_update = true;
         }
 
+        // add fader knot
         if secondary_clicked {
             // screen position
             let click_pos = response.interact_pointer_pos().unwrap();
@@ -804,19 +805,6 @@ impl Cut {
             // insert, or move
             let fader_knots = self.fader_knots.clone().into_iter();
 
-            // if self
-            //     .cut_knots
-            //     .iter_mut()
-            //     .find_map(|k| {
-            //         if k.pos.x == pos.x {
-            //             k.pos.y = pos.y;
-            //             Some(())
-            //         } else {
-            //             None
-            //         }
-            //     })
-            //     .is_none()
-            // {
             println!("new fader knot point");
             let (head, mut tail): (Vec<_>, Vec<_>) = fader_knots.partition(|k| pos.x < k.pos.x);
 
@@ -829,7 +817,7 @@ impl Cut {
             self.fader_knots = tail;
 
             println!("fader knots {:?}", self.fader_knots);
-            // }
+
             fader_update = true;
         }
 
