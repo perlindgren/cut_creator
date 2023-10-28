@@ -794,9 +794,9 @@ impl Cut {
         if secondary_clicked {
             // screen position
             let click_pos = response.interact_pointer_pos().unwrap();
-            // data point
+            // position of the click in bars
             let mut pos = bars_to_screen.inverse().transform_pos_clamped(click_pos);
-
+            // quantized in bars
             let round_x = (pos.x * self.quantization as f32).round() / (self.quantization as f32);
 
             pos.x = round_x;
