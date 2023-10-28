@@ -467,14 +467,15 @@ impl Cut {
 
         // painter.add(Shape::line(fader, config.stroke_fader));
 
-        let mut clicked = response.clicked();
-        let mut update = false;
+        let mut clicked = response.clicked_by(PointerButton::Primary);
+        let mut cut_update = false;
+        let mut fader_update = false;
 
         if ui.input(|i| i.key_pressed(egui::Key::Z) && i.modifiers.ctrl) {
             println!("undo");
         }
 
-        // delete knot
+        // delete cut knot
         if ui.input(|i| i.key_pressed(egui::Key::Delete)) {
             trace!("delete");
             let mut index = 0;
@@ -482,10 +483,21 @@ impl Cut {
 
             self.cut_knots.retain(|k| {
                 index += 1;
+                if k.selected {
+                    cut_update = true
+                }
                 !(k.selected && index > 2 && index < len - 1)
             });
 
-            update = true;
+            let mut index = 0;
+            let len = self.fader_knots.len();
+            self.fader_knots.retain(|k| {
+                index += 1;
+                if k.selected {
+                    fader_update = true
+                }
+                !(k.selected && index > 1 && index < len)
+            });
         }
 
         // selection
@@ -494,9 +506,8 @@ impl Cut {
             || response.double_clicked_by(PointerButton::Secondary)
         {
             trace!("escape");
-            for k in self.cut_knots.iter_mut() {
-                k.selected = false;
-            }
+            self.cut_knots.iter_mut().for_each(|k| k.selected = false);
+            self.fader_knots.iter_mut().for_each(|k| k.selected = false);
         }
 
         if response.drag_started_by(PointerButton::Secondary) {
@@ -518,7 +529,7 @@ impl Cut {
                 }
             });
 
-            update = true;
+            cut_update = true;
             self.select_drag = false;
         }
 
@@ -538,7 +549,7 @@ impl Cut {
             )));
         }
 
-        let cp = self.cut_knots.clone();
+        let cut_knots = self.cut_knots.clone();
         // drag all knots
         if response.drag_started_by(PointerButton::Primary) {
             self.move_drag = true;
@@ -555,7 +566,7 @@ impl Cut {
         }
 
         if response.dragged_by(PointerButton::Primary) {
-            update = true;
+            cut_update = true;
             let scr_pos = response.interact_pointer_pos().unwrap();
             let delta = scr_pos - self.move_last;
             self.move_last = scr_pos;
@@ -569,7 +580,7 @@ impl Cut {
                 trace!("right");
                 // right. we have to update rightmost knot first
                 // exclude first 2 and last 2 knots, they have fixed x positions
-                for i in (2..cp.len() - 2).rev() {
+                for i in (2..cut_knots.len() - 2).rev() {
                     if self.cut_knots[i].selected {
                         let knot_pos_x = ((self.move_knots[i].x + bar_rel.x)
                             * (self.quantization as f32))
@@ -587,7 +598,7 @@ impl Cut {
                 trace!("left");
                 // left we update leftmost knot first
                 // we exclude first 2 and last 2 knots, they have fixed positions
-                for i in 2..cp.len() - 2 {
+                for i in 2..cut_knots.len() - 2 {
                     if self.cut_knots[i].selected {
                         println!("i {} ", i);
 
@@ -606,7 +617,7 @@ impl Cut {
             }
 
             // left or up/down, we update leftmost knot first
-            for i in 1..cp.len() - 1 {
+            for i in 1..cut_knots.len() - 1 {
                 if self.cut_knots[i].selected {
                     println!("i {} ", i);
                     self.cut_knots[i].pos.y = (self.move_knots[i].y + bar_rel.y).min(1.0).max(0.0);
@@ -615,11 +626,11 @@ impl Cut {
         }
 
         let control_point_radius = 8.0;
-        // knots
-        let control_point_shapes: Vec<Shape> = self.cut_knots[1..if self.looping {
-            cp.len() - 2
+        // cut knots
+        let cut_knot_shapes: Vec<Shape> = self.cut_knots[1..if self.looping {
+            cut_knots.len() - 2
         } else {
-            cp.len() - 1
+            cut_knots.len() - 1
         }]
             .iter_mut()
             .enumerate()
@@ -653,15 +664,15 @@ impl Cut {
                     println!("rounded {:?}", knot_pos.x);
 
                     // never move first 2 and last 2 knots in x direction
-                    if i > 0 && i < cp.len() - 3 {
+                    if i > 0 && i < cut_knots.len() - 3 {
                         if knot_pos.x > k.pos.x {
                             // right
-                            if knot_pos.x < cp[i + 2].pos.x {
+                            if knot_pos.x < cut_knots[i + 2].pos.x {
                                 k.pos.x = knot_pos.x;
                             }
                         } else if knot_pos.x < k.pos.x {
                             // left
-                            if knot_pos.x > cp[i].pos.x {
+                            if knot_pos.x > cut_knots[i].pos.x {
                                 k.pos.x = knot_pos.x;
                             }
                         }
@@ -669,7 +680,7 @@ impl Cut {
 
                     k.pos.y = knot_pos.y.min(1.0).max(0.0); // clamp to range
 
-                    update = true;
+                    cut_update = true;
                 }
 
                 Shape::circle_stroke(
@@ -681,6 +692,79 @@ impl Cut {
                         config.stroke_knot
                     },
                 )
+            })
+            .collect();
+
+        let control_point_radius = 8.0;
+        let fader_knots = self.fader_knots.clone();
+        // fader knots
+        let fader_knot_shapes: Vec<Shape> = self.fader_knots[0..if self.looping {
+            fader_knots.len() - 1
+        } else {
+            fader_knots.len()
+        }]
+            .iter_mut()
+            .enumerate()
+            .map(|(i, k)| {
+                let size = Vec2::splat(2.0 * control_point_radius);
+                let point_in_screen = bars_to_screen * k.pos;
+
+                let point_rect = Rect::from_center_size(point_in_screen, size);
+
+                let point_id = response.id.with(i + cut_knots.len());
+                let point_click = ui.interact(point_rect, point_id, Sense::click());
+
+                // toggle select on click
+                if point_click.clicked() {
+                    k.selected ^= true;
+                    clicked = false;
+                }
+
+                let point_response = ui.interact(point_rect, point_id, Sense::drag());
+
+                //         // if point_response.drag_released() {
+                //         //     println!("released");
+                //         // }
+
+                if point_response.dragged() {
+                    let pos = point_response.interact_pointer_pos().unwrap();
+                    let mut knot_pos = bars_to_screen.inverse().transform_pos(pos);
+                    println!("single_knot_drag {:?}", knot_pos.x);
+                    knot_pos.x = (knot_pos.x * (self.quantization as f32)).round()
+                        / (self.quantization as f32);
+                    println!("rounded {:?}", knot_pos.x);
+
+                    // never move last knot
+                    // we could think about clamping to 0.0, 1.0 for binary fader
+                    if i > 0 && i < fader_knots.len() - 1 {
+                        if knot_pos.x >= k.pos.x {
+                            // right
+                            println!("-- right");
+                            if knot_pos.x <= fader_knots[i + 1].pos.x {
+                                k.pos.x = knot_pos.x;
+                            }
+                        } else if knot_pos.x < k.pos.x {
+                            // left
+                            if knot_pos.x >= fader_knots[i - 1].pos.x {
+                                k.pos.x = knot_pos.x;
+                            }
+                        }
+                    }
+
+                    k.pos.y = knot_pos.y.min(1.0).max(0.0); // clamp to range
+
+                    fader_update = true;
+                }
+
+                Shape::Rect(RectShape::stroke(
+                    point_rect,
+                    0.0,
+                    if k.selected {
+                        config.stroke_knot_selected
+                    } else {
+                        config.stroke_knot
+                    },
+                ))
             })
             .collect();
 
@@ -724,11 +808,15 @@ impl Cut {
 
                 println!("knots {:?}", self.cut_knots);
             }
-            update = true;
+            cut_update = true;
         }
 
-        if update {
+        if cut_update {
             self.cut_spline_update();
+        }
+
+        if fader_update {
+            self.fader_spline_update();
         }
 
         // draw spline
@@ -831,8 +919,9 @@ impl Cut {
             .collect();
         painter.add(PathShape::line(points_in_screen, config.stroke_fader));
 
-        // knots
-        painter.extend(control_point_shapes);
+        // cut and fader knots
+        painter.extend(cut_knot_shapes);
+        painter.extend(fader_knot_shapes);
 
         // hover line
         if let Some(pos) = ui
