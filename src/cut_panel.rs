@@ -324,11 +324,28 @@ impl Cut {
 
     /// call to update spline when knots are changed
     pub fn fader_spline_update(&mut self) {
+        let len = self.fader_knots.len();
+
         self.fader_spline = Spline::from_iter(
-            self.fader_knots
+            self.fader_knots[..len]
                 .iter()
                 .map(|k| splines::Key::new(k.pos.x, k.pos.y, Interpolation::Linear)),
         );
+
+        // add last knots
+        if self.looping {
+            println!("--------------- looping");
+            self.fader_spline.add(splines::Key::new(
+                self.fader_knots[len - 1].pos.x,
+                self.fader_knots[0].pos.y,
+                Interpolation::Linear,
+            ));
+        } else {
+            println!("--------------- non looping");
+            let pos = self.fader_knots[len - 1].pos;
+            self.fader_spline
+                .add(splines::Key::new(pos.x, pos.y, Interpolation::Linear));
+        }
     }
 
     /// get the cursor position
@@ -387,7 +404,8 @@ impl Cut {
         if ui.checkbox(&mut self.looping, "looping").clicked()
             || ui.checkbox(&mut self.warping, "warping").clicked()
         {
-            self.cut_spline_update()
+            self.cut_spline_update();
+            self.fader_spline_update();
         }
 
         if ui
@@ -467,7 +485,10 @@ impl Cut {
 
         // painter.add(Shape::line(fader, config.stroke_fader));
 
-        let mut clicked = response.clicked_by(PointerButton::Primary);
+        let mut primary_clicked = response.clicked_by(PointerButton::Primary);
+        let mut _middle_clicked = response.clicked_by(PointerButton::Middle);
+        let secondary_clicked = response.clicked_by(PointerButton::Secondary);
+
         let mut cut_update = false;
         let mut fader_update = false;
 
@@ -625,8 +646,8 @@ impl Cut {
             }
         }
 
-        let control_point_radius = 8.0;
         // cut knots
+        let control_point_radius = 8.0;
         let cut_knot_shapes: Vec<Shape> = self.cut_knots[1..if self.looping {
             cut_knots.len() - 2
         } else {
@@ -646,7 +667,7 @@ impl Cut {
                 // toggle select on click
                 if point_click.clicked() {
                     k.selected ^= true;
-                    clicked = false;
+                    primary_clicked = false;
                 }
 
                 let point_response = ui.interact(point_rect, point_id, Sense::drag());
@@ -695,9 +716,9 @@ impl Cut {
             })
             .collect();
 
+        // fader knots
         let control_point_radius = 8.0;
         let fader_knots = self.fader_knots.clone();
-        // fader knots
         let fader_knot_shapes: Vec<Shape> = self.fader_knots[0..if self.looping {
             fader_knots.len() - 1
         } else {
@@ -717,7 +738,7 @@ impl Cut {
                 // toggle select on click
                 if point_click.clicked() {
                     k.selected ^= true;
-                    clicked = false;
+                    primary_clicked = false;
                 }
 
                 let point_response = ui.interact(point_rect, point_id, Sense::drag());
@@ -768,8 +789,8 @@ impl Cut {
             })
             .collect();
 
-        // add new point
-        if clicked {
+        // add new cut knot point
+        if primary_clicked {
             // screen position
             let click_pos = response.interact_pointer_pos().unwrap();
             // data point
@@ -795,7 +816,7 @@ impl Cut {
                 })
                 .is_none()
             {
-                println!("new point");
+                trace!("new cut knot point");
                 let (head, mut tail): (Vec<_>, Vec<_>) = cp.partition(|k| pos.x < k.pos.x);
 
                 tail.push(Knot {
@@ -806,9 +827,51 @@ impl Cut {
 
                 self.cut_knots = tail;
 
-                println!("knots {:?}", self.cut_knots);
+                trace!("cut knots {:?}", self.cut_knots);
             }
             cut_update = true;
+        }
+
+        if secondary_clicked {
+            // screen position
+            let click_pos = response.interact_pointer_pos().unwrap();
+            // data point
+            let mut pos = bars_to_screen.inverse().transform_pos_clamped(click_pos);
+
+            let round_x = (pos.x * self.quantization as f32).round() / (self.quantization as f32);
+
+            pos.x = round_x;
+
+            // insert, or move
+            let fader_knots = self.fader_knots.clone().into_iter();
+
+            // if self
+            //     .cut_knots
+            //     .iter_mut()
+            //     .find_map(|k| {
+            //         if k.pos.x == pos.x {
+            //             k.pos.y = pos.y;
+            //             Some(())
+            //         } else {
+            //             None
+            //         }
+            //     })
+            //     .is_none()
+            // {
+            println!("new fader knot point");
+            let (head, mut tail): (Vec<_>, Vec<_>) = fader_knots.partition(|k| pos.x < k.pos.x);
+
+            tail.push(Knot {
+                pos,
+                selected: false,
+            });
+            tail.extend(head);
+
+            self.fader_knots = tail;
+
+            println!("fader knots {:?}", self.fader_knots);
+            // }
+            fader_update = true;
         }
 
         if cut_update {
