@@ -102,9 +102,13 @@ pub struct Cut {
     #[serde(skip)]
     move_last: Pos2,
 
-    /// Start positions for each knot
+    /// Start positions for each cut knot
     #[serde(skip)]
-    move_knots: Vec<Pos2>,
+    move_cut_initial_pos: Vec<Pos2>,
+
+    /// Start positions for each fader knot
+    #[serde(skip)]
+    move_fader_initial_pos: Vec<Pos2>,
 
     /// Cursor
     #[serde(skip)]
@@ -203,7 +207,8 @@ impl Default for Cut {
             move_drag: false,
             move_start: Pos2::ZERO,
             move_last: Pos2::ZERO,
-            move_knots: vec![],
+            move_cut_initial_pos: vec![],
+            move_fader_initial_pos: vec![],
             cursor: None,
             value: None,
             looping: false,
@@ -542,12 +547,14 @@ impl Cut {
         }
 
         let cut_knots = self.cut_knots.clone();
+        let fader_knots = self.fader_knots.clone();
         // drag all knots
         if response.drag_started_by(PointerButton::Primary) {
             self.move_drag = true;
             self.move_start = response.interact_pointer_pos().unwrap();
             self.move_last = self.move_start;
-            self.move_knots = self.cut_knots.iter().map(|k| k.pos).collect();
+            self.move_cut_initial_pos = self.cut_knots.iter().map(|k| k.pos).collect();
+            self.move_fader_initial_pos = self.fader_knots.iter().map(|k| k.pos).collect();
             trace!("start move {:?}", self.move_start);
         }
 
@@ -570,11 +577,13 @@ impl Cut {
 
             if delta.x > 0.0 {
                 trace!("right");
+
+                // cut knots
                 // right. we have to update rightmost knot first
                 // exclude first 2 and last 2 knots, they have fixed x positions
                 for i in (2..cut_knots.len() - 2).rev() {
                     if self.cut_knots[i].selected {
-                        let knot_pos_x = ((self.move_knots[i].x + bar_rel.x)
+                        let knot_pos_x = ((self.move_cut_initial_pos[i].x + bar_rel.x)
                             * (self.quantization as f32))
                             .round()
                             / (self.quantization as f32);
@@ -586,15 +595,33 @@ impl Cut {
                         }
                     }
                 }
+
+                // fader knots
+                // right. we have to update rightmost knot first
+                // exclude first and last knots, they have fixed x positions
+                for i in (1..fader_knots.len() - 1).rev() {
+                    if self.fader_knots[i].selected {
+                        let knot_pos_x = ((self.move_fader_initial_pos[i].x + bar_rel.x)
+                            * (self.quantization as f32))
+                            .round()
+                            / (self.quantization as f32);
+
+                        if knot_pos_x <= self.fader_knots[i + 1].pos.x
+                            && knot_pos_x >= self.fader_knots[i - 1].pos.x
+                        {
+                            self.fader_knots[i].pos.x = knot_pos_x;
+                        }
+                    }
+                }
             } else if delta.x < 0.0 {
                 trace!("left");
+
+                // cut knots
                 // left we update leftmost knot first
                 // we exclude first 2 and last 2 knots, they have fixed positions
                 for i in 2..cut_knots.len() - 2 {
                     if self.cut_knots[i].selected {
-                        println!("i {} ", i);
-
-                        let knot_pos_x = ((self.move_knots[i].x + bar_rel.x)
+                        let knot_pos_x = ((self.move_cut_initial_pos[i].x + bar_rel.x)
                             * (self.quantization as f32))
                             .round()
                             / (self.quantization as f32);
@@ -606,13 +633,32 @@ impl Cut {
                         }
                     }
                 }
+
+                // fader knots
+                // left we update leftmost knot first
+                // we exclude first and last knots, they have fixed positions
+                for i in 1..fader_knots.len() - 1 {
+                    if self.fader_knots[i].selected {
+                        let knot_pos_x = ((self.move_fader_initial_pos[i].x + bar_rel.x)
+                            * (self.quantization as f32))
+                            .round()
+                            / (self.quantization as f32);
+
+                        if knot_pos_x >= self.fader_knots[i - 1].pos.x
+                            && knot_pos_x <= self.fader_knots[i + 1].pos.x
+                        {
+                            self.fader_knots[i].pos.x = knot_pos_x;
+                        }
+                    }
+                }
             }
 
-            // left or up/down, we update leftmost knot first
+            // cut knots up/down
             for i in 1..cut_knots.len() - 1 {
                 if self.cut_knots[i].selected {
-                    println!("i {} ", i);
-                    self.cut_knots[i].pos.y = (self.move_knots[i].y + bar_rel.y).min(1.0).max(0.0);
+                    self.cut_knots[i].pos.y = (self.move_cut_initial_pos[i].y + bar_rel.y)
+                        .min(1.0)
+                        .max(0.0);
                 }
             }
         }
@@ -689,7 +735,6 @@ impl Cut {
 
         // fader knots
         let control_point_radius = 8.0;
-        let fader_knots = self.fader_knots.clone();
         let fader_knot_shapes: Vec<Shape> = self.fader_knots[0..if self.looping {
             fader_knots.len() - 1
         } else {
