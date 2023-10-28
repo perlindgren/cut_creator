@@ -146,10 +146,6 @@ impl Default for Cut {
 
         let fader_knots = vec![
             Knot {
-                pos: pos2(-0.25, 0.0),
-                selected: false,
-            },
-            Knot {
                 pos: pos2(0.0, 0.0),
                 selected: false,
             },
@@ -171,10 +167,6 @@ impl Default for Cut {
             },
             Knot {
                 pos: pos2(2.0, 0.0),
-                selected: false,
-            },
-            Knot {
-                pos: pos2(2.25, 0.0),
                 selected: false,
             },
         ];
