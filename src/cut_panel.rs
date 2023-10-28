@@ -319,17 +319,18 @@ impl Cut {
         let len = self.fader_knots.len();
 
         self.fader_spline = Spline::from_iter(
-            self.fader_knots[..len]
+            self.fader_knots[..len - 1]
                 .iter()
                 .map(|k| splines::Key::new(k.pos.x, k.pos.y, Interpolation::Linear)),
         );
 
-        // add last knots
+        // add last knot
         if self.looping {
             println!("--------------- looping");
             self.fader_spline.add(splines::Key::new(
                 self.fader_knots[len - 1].pos.x,
-                self.fader_knots[0].pos.y,
+                0.0,
+                // self.fader_knots[0].pos.y,
                 Interpolation::Linear,
             ));
         } else {
@@ -338,6 +339,7 @@ impl Cut {
             self.fader_spline
                 .add(splines::Key::new(pos.x, pos.y, Interpolation::Linear));
         }
+        println!("spline {:?}", self.fader_spline);
     }
 
     /// get the cursor position
@@ -967,11 +969,21 @@ impl Cut {
         }
 
         // draw connecting lines for fader
-        let points_in_screen: Vec<Pos2> = self
-            .fader_knots
+        let len = self.fader_knots.len();
+        let mut points_in_screen: Vec<Pos2> = self.fader_knots[0..len - 1]
             .iter()
             .map(|k| bars_to_screen * k.pos)
             .collect();
+
+        points_in_screen.push(
+            bars_to_screen
+                * if self.looping {
+                    Pos2::new(self.fader_knots[len - 1].pos.x, self.fader_knots[0].pos.y)
+                } else {
+                    self.fader_knots[len - 1].pos
+                },
+        );
+
         painter.add(PathShape::line(points_in_screen, config.stroke_fader));
 
         // cut and fader knots
