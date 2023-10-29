@@ -225,6 +225,7 @@ impl eframe::App for App {
                         }
                     });
 
+                    // Ctrl-O to load file
                     if ui.input_mut(|i| i.consume_key(Modifiers::CTRL, Key::O)) {
                         opt_load_file = Some(self.cur_cut);
                     }

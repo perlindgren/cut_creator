@@ -31,6 +31,20 @@ pub struct Knot {
     selected: bool,
 }
 
+#[derive(Debug)]
+enum CheckPointData {
+    CutKnots(Vec<Knot>),
+    FaderKnots(Vec<Knot>),
+}
+
+enum Undo {
+    CutKnots,
+    FaderKnots,
+}
+
+// #[derive(Debug, Default)]
+// struct Undos(Vec<UndoData>);
+
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Cut {
     /// path to the cut
@@ -61,6 +75,10 @@ pub struct Cut {
     pub wav: Wav,
 
     /// Run-time only data
+
+    /// Undo stack
+    #[serde(skip)]
+    checkpoints: Vec<Vec<CheckPointData>>,
 
     /// Cut Spline
     #[serde(skip)]
@@ -200,6 +218,7 @@ impl Default for Cut {
             wav_data: WavData::default(),
 
             // Non persistent data
+            checkpoints: vec![],
             needs_save: false,
             select_start: Pos2::ZERO,
             select_end: Pos2::ZERO,
@@ -334,7 +353,6 @@ impl Cut {
 
         // add last knot
         if self.looping {
-            println!("--------------- looping");
             self.fader_spline.add(splines::Key::new(
                 self.fader_knots[len - 1].pos.x,
                 0.0,
@@ -342,12 +360,11 @@ impl Cut {
                 Interpolation::Linear,
             ));
         } else {
-            println!("--------------- non looping");
             let pos = self.fader_knots[len - 1].pos;
             self.fader_spline
                 .add(splines::Key::new(pos.x, pos.y, Interpolation::Linear));
         }
-        println!("spline {:?}", self.fader_spline);
+        println!("spline update {:?}", self.fader_spline);
     }
 
     /// get the cursor position
@@ -437,6 +454,12 @@ impl Cut {
             response.rect,
         );
 
+        // check points
+        let mut checkpoint = vec![];
+
+        // let mut fader_knots_checkpoint = false;
+        // let mut cut_knots_checkpoint = false;
+
         // panel_pos relation to bars
         let width = response.rect.width();
         let segments = self.bars * self.quantization as f32;
@@ -459,34 +482,49 @@ impl Cut {
         let mut cut_update = false;
         let mut fader_update = false;
 
-        if ui.input(|i| i.key_pressed(egui::Key::Z) && i.modifiers.ctrl) {
-            println!("undo");
-        }
-
         // delete knots
         if ui.input(|i| i.key_pressed(egui::Key::Delete)) {
             trace!("delete");
+
             // cut knots
             let mut index = 0;
             let len = self.cut_knots.len();
-            self.cut_knots.retain(|k| {
+            let mut cut_knots = self.cut_knots.clone();
+            let mut delete_any = false;
+
+            cut_knots.retain(|k| {
                 index += 1;
-                if k.selected {
-                    cut_update = true
-                }
-                !(k.selected && index > 2 && index < len - 1)
+                let delete = !(k.selected && index > 2 && index < len - 1);
+                cut_update |= delete;
+                delete_any |= delete;
+                delete
             });
+
+            if delete_any {
+                println!("delete cut knots");
+                checkpoint.push(CheckPointData::CutKnots(self.cut_knots.clone()));
+                self.cut_knots = cut_knots;
+            }
 
             // fader knots
             let mut index = 0;
             let len = self.fader_knots.len();
-            self.fader_knots.retain(|k| {
+            let mut fader_knots = self.fader_knots.clone();
+            let mut delete_any = false;
+
+            fader_knots.retain(|k| {
                 index += 1;
-                if k.selected {
-                    fader_update = true
-                }
-                !(k.selected && index > 1 && index < len)
+                let delete = !(k.selected && index > 1 && index < len);
+                fader_update |= delete;
+                delete_any |= delete;
+                delete
             });
+
+            if delete_any {
+                println!("delete fader knots");
+                checkpoint.push(CheckPointData::FaderKnots(self.fader_knots.clone()));
+                self.fader_knots = fader_knots;
+            }
         }
 
         // selection
@@ -516,6 +554,7 @@ impl Cut {
             self.cut_knots.iter_mut().for_each(|cut_knot| {
                 if rect.contains(bars_to_screen * cut_knot.pos) {
                     cut_knot.selected ^= true;
+                    // cut_knots_checkpoint = true;
                 }
             });
 
@@ -523,6 +562,7 @@ impl Cut {
             self.fader_knots.iter_mut().for_each(|fader_knot| {
                 if rect.contains(bars_to_screen * fader_knot.pos) {
                     fader_knot.selected ^= true;
+                    //  fader_knots_checkpoint = true;
                 }
             });
 
@@ -561,6 +601,8 @@ impl Cut {
         if response.drag_released_by(PointerButton::Primary) {
             self.move_drag = true;
             trace!("end move");
+            // cut_knots_checkpoint = true;
+            // fader_knots_checkpoint = true;
             self.move_drag = false;
         }
 
@@ -664,6 +706,7 @@ impl Cut {
         }
 
         // cut knots
+        let mut cut_knots_check_point = false;
         let control_point_radius = 8.0;
         let cut_knot_shapes: Vec<Shape> = self.cut_knots[1..if self.looping {
             cut_knots.len() - 2
@@ -690,16 +733,17 @@ impl Cut {
                 let point_response = ui.interact(point_rect, point_id, Sense::drag());
 
                 if point_response.drag_released() {
-                    println!("released");
+                    println!("released - undo cut_knots");
+                    cut_knots_check_point = true;
                 }
 
                 if point_response.dragged() {
                     let pos = point_response.interact_pointer_pos().unwrap();
                     let mut knot_pos = bars_to_screen.inverse().transform_pos(pos);
-                    println!("single_knot_drag {:?}", knot_pos.x);
+                    trace!("single_knot_drag {:?}", knot_pos.x);
                     knot_pos.x = (knot_pos.x * (self.quantization as f32)).round()
                         / (self.quantization as f32);
-                    println!("rounded {:?}", knot_pos.x);
+                    trace!("rounded {:?}", knot_pos.x);
 
                     // never move first 2 and last 2 knots in x direction
                     if i > 0 && i < cut_knots.len() - 3 {
@@ -735,6 +779,7 @@ impl Cut {
 
         // fader knots
         let control_point_radius = 8.0;
+
         let fader_knot_shapes: Vec<Shape> = self.fader_knots[0..if self.looping {
             fader_knots.len() - 1
         } else {
@@ -759,9 +804,10 @@ impl Cut {
 
                 let point_response = ui.interact(point_rect, point_id, Sense::drag());
 
-                //         // if point_response.drag_released() {
-                //         //     println!("released");
-                //         // }
+                if point_response.drag_released() {
+                    println!("released - undo fader_knots");
+                    // fader_knots_checkpoint = true;
+                }
 
                 if point_response.dragged() {
                     let pos = point_response.interact_pointer_pos().unwrap();
@@ -1075,6 +1121,34 @@ impl Cut {
                     stroke_grid_16
                 },
             ));
+        }
+
+        // store checkpoint
+        if !checkpoint.is_empty() {
+            println!("store checkpoint");
+            self.checkpoints.push(checkpoint);
+        }
+
+        // restore checkpoint
+        if ui.input_mut(|i| i.consume_key(Modifiers::CTRL, Key::Z)) {
+            println!("Ctrl-Z");
+            // restore checkpoint
+            if let Some(check_point) = self.checkpoints.pop() {
+                check_point
+                    .into_iter()
+                    .for_each(|check_point_data| match check_point_data {
+                        CheckPointData::CutKnots(cut_knots) => {
+                            println!("restore {:?}", cut_knots);
+                            self.cut_knots = cut_knots;
+                            self.cut_spline_update()
+                        }
+                        CheckPointData::FaderKnots(fader_knots) => {
+                            println!("restore {:?}", fader_knots);
+                            self.fader_knots = fader_knots;
+                            self.fader_spline_update();
+                        }
+                    });
+            }
         }
 
         response
