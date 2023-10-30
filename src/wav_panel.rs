@@ -87,6 +87,15 @@ impl Wav {
         self.redo.len()
     }
 
+    pub fn needs_save(&self) -> bool {
+        !self.undo.is_empty()
+    }
+
+    pub fn clear_undo_redo(&mut self) {
+        self.undo = vec![];
+        self.redo = vec![];
+    }
+
     /// control panel
     pub fn ui_content_ctrl(&mut self, ui: &mut Ui, wav_data: &WavData, i: usize) {
         ui.label(format!("#{}: {}", i, wav_data.filename));

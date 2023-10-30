@@ -258,7 +258,7 @@ impl OptCut {
 impl Cut {
     // needs save if undo len > 0
     pub fn needs_save(&self) -> bool {
-        !self.undo.is_empty()
+        !self.undo.is_empty() || self.wav.needs_save()
     }
 
     // name
@@ -281,12 +281,12 @@ impl Cut {
 
     // get undo len
     pub fn get_undo_len(&self) -> usize {
-        self.undo.len()
+        self.undo.len() + self.wav.get_undo_len()
     }
 
     // get redo len
     pub fn get_redo_len(&self) -> usize {
-        self.redo.len()
+        self.redo.len() + self.wav.get_redo_len()
     }
 
     // load file
@@ -357,7 +357,6 @@ impl Cut {
             splines::Key::new(knot.pos.x, knot.pos.y, Interpolation::CatmullRom)
         }
         trace!("update knots and spline");
-        // self.needs_save = true;
         let len = self.cut_knots.len();
         // ensure that endpoints are aligned
         self.cut_knots[0].pos.y = self.cut_knots[1].pos.y;
@@ -428,9 +427,9 @@ impl Cut {
 
         match File::create(&self.cut_path) {
             Ok(mut file) => {
-                // self.needs_save = false;
                 self.redo = vec![];
                 self.undo = vec![];
+                self.wav.clear_undo_redo();
                 if let Err(err) = file.write_all(json.as_bytes()) {
                     println!("Err {:?}", err);
                     format!("{:?}", err)

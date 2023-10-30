@@ -263,7 +263,6 @@ impl eframe::App for App {
                     .show(ctx, |ui| {
                         let top_panel_info = match self.cuts[self.cur_cut].0 {
                             Some(ref cut) => {
-                                // #{}: {}", i, opt_cut.get_name()
                                 format!(
                                     "#{}: {}, Undo #{:5}, Redo #{}",
                                     self.cur_cut,
