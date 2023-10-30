@@ -81,7 +81,10 @@ pub struct Cut {
 
     /// Undo stack
     #[serde(skip)]
-    checkpoints: Vec<Vec<CheckPointData>>,
+    undo: Vec<Vec<CheckPointData>>,
+
+    #[serde(skip)]
+    redo: Vec<Vec<CheckPointData>>,
 
     /// Cut Spline
     #[serde(skip)]
@@ -225,7 +228,8 @@ impl Default for Cut {
             wav_data: WavData::default(),
 
             // Non persistent data
-            checkpoints: vec![],
+            undo: vec![],
+            redo: vec![],
             needs_save: false,
             select_start: Pos2::ZERO,
             select_end: Pos2::ZERO,
@@ -247,7 +251,7 @@ impl Default for Cut {
 impl Cut {
     // get undo len
     pub fn get_checkpoints_len(&self) -> usize {
-        self.checkpoints.len()
+        self.undo.len()
     }
 
     // load file
@@ -1172,34 +1176,80 @@ impl Cut {
         // store checkpoint
         if !checkpoint.is_empty() {
             println!("store checkpoint");
-            self.checkpoints.push(checkpoint);
+            self.undo.push(checkpoint);
         }
 
-        // restore checkpoint
+        // undo checkpoint
         if ui.input_mut(|i| i.consume_key(Modifiers::CTRL, Key::Z)) {
             println!("Ctrl-Z");
-            // restore checkpoint
-            if let Some(check_point) = self.checkpoints.pop() {
+            if let Some(check_point) = self.undo.pop() {
+                let mut redo = vec![];
                 check_point
                     .into_iter()
                     .for_each(|check_point_data| match check_point_data {
                         CheckPointData::CutKnots(cut_knots) => {
-                            println!("restore {:?}", cut_knots);
+                            println!("undo cut_knots {:?}", cut_knots);
+                            redo.push(CheckPointData::FaderKnots(self.cut_knots.clone()));
                             self.cut_knots = cut_knots;
                             self.cut_spline_update()
                         }
                         CheckPointData::FaderKnots(fader_knots) => {
-                            println!("restore {:?}", fader_knots);
+                            println!("undo fader_knots {:?}", fader_knots);
+                            redo.push(CheckPointData::FaderKnots(self.fader_knots.clone()));
                             self.fader_knots = fader_knots;
                             self.fader_spline_update();
                         }
                         CheckPointData::CutKnot(IndexKnot { index, knot }) => {
-                            println!("restore cut knot {:?}", index);
+                            println!("undo cut_knot {:?}", index);
+                            redo.push(CheckPointData::CutKnot(IndexKnot {
+                                index,
+                                knot: self.cut_knots[index],
+                            }));
                             self.cut_knots[index] = knot;
                             self.cut_spline_update();
                         }
                         CheckPointData::FaderKnot(IndexKnot { index, knot }) => {
-                            println!("restore fader knot {:?}", index);
+                            println!("undo fader knot {:?}", index);
+                            redo.push(CheckPointData::CutKnot(IndexKnot {
+                                index,
+                                knot: self.fader_knots[index],
+                            }));
+                            self.fader_knots[index] = knot;
+                            self.fader_spline_update();
+                        }
+                    });
+                if !redo.is_empty() {
+                    println!("store redo checkpoint");
+                    self.redo.push(redo);
+                }
+            }
+        }
+
+        // redo checkpoint
+        if ui.input_mut(|i| i.consume_key(Modifiers::CTRL | Modifiers::SHIFT, Key::Z)) {
+            println!("Ctrl-Z");
+            // restore checkpoint
+            if let Some(check_point) = self.redo.pop() {
+                check_point
+                    .into_iter()
+                    .for_each(|check_point_data| match check_point_data {
+                        CheckPointData::CutKnots(cut_knots) => {
+                            println!("redo cut_knots {:?}", cut_knots);
+                            self.cut_knots = cut_knots;
+                            self.cut_spline_update()
+                        }
+                        CheckPointData::FaderKnots(fader_knots) => {
+                            println!("redo fader_knots {:?}", fader_knots);
+                            self.fader_knots = fader_knots;
+                            self.fader_spline_update();
+                        }
+                        CheckPointData::CutKnot(IndexKnot { index, knot }) => {
+                            println!("redo cut knot {:?}", index);
+                            self.cut_knots[index] = knot;
+                            self.cut_spline_update();
+                        }
+                        CheckPointData::FaderKnot(IndexKnot { index, knot }) => {
+                            println!("redo fader knot {:?}", index);
                             self.fader_knots[index] = knot;
                             self.fader_spline_update();
                         }
