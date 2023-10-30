@@ -3,7 +3,10 @@
 use std::fs::File;
 use std::io::prelude::*;
 
-use cut_creator::{config::Config, cut_panel::Cut};
+use cut_creator::{
+    config::Config,
+    cut_panel::{Cut, OptCut},
+};
 
 use egui::*;
 use log::trace;
@@ -34,7 +37,7 @@ struct App {
     ///
     enabled: [bool; 10],
     /// we have 10 save slots
-    cuts: [Option<Cut>; 10],
+    cuts: [OptCut; 10],
     /// index of selected cut
     cur_cut: usize,
     /// config
@@ -53,7 +56,7 @@ impl App {
         self.status = match Cut::load_file() {
             Ok(cut) => {
                 let path = cut.cut_path.clone();
-                self.cuts[self.cur_cut] = Some(cut);
+                self.cuts[self.cur_cut] = OptCut(Some(cut));
                 self.enabled[i] = true;
                 format!("File loaded {}", path.to_string_lossy())
             }
@@ -87,8 +90,8 @@ impl eframe::App for App {
     fn on_close_event(&mut self) -> bool {
         trace!("close");
         if self.cuts.iter().any(|opt_cut| {
-            if let Some(cut) = opt_cut {
-                cut.needs_save
+            if let Some(ref cut) = opt_cut.0 {
+                cut.needs_save()
             } else {
                 false
             }
@@ -191,15 +194,11 @@ impl eframe::App for App {
                     let mut opt_load_file: Option<usize> = None;
 
                     for (i, opt_cut) in self.cuts.iter_mut().enumerate() {
-                        let path = if let Some(cut) = opt_cut {
-                            format!("{}{}", cut.name(), if cut.needs_save { "*" } else { "" })
-                        } else {
-                            "...".to_string()
-                        };
-
                         // each cut has a corresponding button
-                        let button =
-                            ui.selectable_label(self.enabled[i], format!("#{}: {}", i, path));
+                        let button = ui.selectable_label(
+                            self.enabled[i],
+                            format!("#{}: {}", i, opt_cut.get_name()),
+                        );
 
                         // check hover
                         if button.interact(Sense::hover()).hovered() {
@@ -238,7 +237,7 @@ impl eframe::App for App {
                     ui.label("Cut Settings");
                     ui.add_space(10.0);
 
-                    if let Some(cut) = &mut self.cuts[self.cur_cut] {
+                    if let Some(cut) = &mut self.cuts[self.cur_cut].0 {
                         cut.wav.ui_content_ctrl(ui, &cut.wav_data, self.cur_cut);
 
                         cut.ui_content_settings(ui, &mut self.status);
@@ -262,8 +261,17 @@ impl eframe::App for App {
                             .inner_margin(egui::Margin::same(0.0)),
                     )
                     .show(ctx, |ui| {
-                        let nr_undos = match self.cuts[self.cur_cut] {
-                            Some(ref cut) => format!("Checkpoints #{}", cut.get_checkpoints_len()),
+                        let nr_undos = match self.cuts[self.cur_cut].0 {
+                            Some(ref cut) => {
+                                // #{}: {}", i, opt_cut.get_name()
+                                format!(
+                                    "#{}: {}, Undo #{:5}, Redo #{}",
+                                    self.cur_cut,
+                                    cut.get_name(),
+                                    cut.get_undo_len(),
+                                    cut.get_redo_len()
+                                )
+                            }
                             _ => "".to_string(),
                         };
                         ui.label(nr_undos);
@@ -309,7 +317,7 @@ impl eframe::App for App {
                                         .outer_margin(egui::Margin::same(3.0))
                                         .inner_margin(egui::Margin::same(0.0))
                                         .show(ui, |ui| {
-                                            if let Some(cut) = opt_cut {
+                                            if let Some(ref mut cut) = opt_cut.0 {
                                                 cut.wav.ui_content(
                                                     ui,
                                                     cut.get_cursor(),
@@ -340,7 +348,7 @@ impl eframe::App for App {
                                         .outer_margin(egui::Margin::same(3.0))
                                         .inner_margin(egui::Margin::same(0.0))
                                         .show(ui, |ui| {
-                                            if let Some(cut) = opt_cut {
+                                            if let Some(ref mut cut) = opt_cut.0 {
                                                 cut.ui_content(ui, &self.config, cut_height);
                                             }
                                         });

@@ -45,9 +45,6 @@ struct IndexKnot {
     knot: Knot,
 }
 
-// #[derive(Debug, Default)]
-// struct Undos(Vec<UndoData>);
-
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Cut {
     /// path to the cut
@@ -93,10 +90,6 @@ pub struct Cut {
     /// Fader Spline
     #[serde(skip)]
     fader_spline: Spline<f32, f32>,
-
-    /// Needs save
-    #[serde(skip)]
-    pub needs_save: bool,
 
     /// Wav Data
     #[serde(skip)]
@@ -230,7 +223,7 @@ impl Default for Cut {
             // Non persistent data
             undo: vec![],
             redo: vec![],
-            needs_save: false,
+            // needs_save: false,
             select_start: Pos2::ZERO,
             select_end: Pos2::ZERO,
             select_drag: false,
@@ -248,10 +241,52 @@ impl Default for Cut {
     }
 }
 
+#[derive(Default)]
+pub struct OptCut(pub Option<Cut>);
+
+impl OptCut {
+    /// get name
+    pub fn get_name(&self) -> String {
+        if let Some(cut) = &self.0 {
+            cut.get_name()
+        } else {
+            "...".to_string()
+        }
+    }
+}
+
 impl Cut {
+    // needs save if undo len > 0
+    pub fn needs_save(&self) -> bool {
+        self.undo.len() > 0
+    }
+
+    // name
+    pub fn name(&self) -> String {
+        self.cut_path
+            .file_name()
+            .map_or("<TBD>".to_string(), |path| {
+                path.to_string_lossy().to_string()
+            })
+    }
+
+    // get name
+    pub fn get_name(&self) -> String {
+        format!(
+            "{}{}",
+            self.name(),
+            if self.needs_save() { "*" } else { "" }
+        )
+    }
+
     // get undo len
-    pub fn get_checkpoints_len(&self) -> usize {
+    pub fn get_undo_len(&self) -> usize {
         self.undo.len()
+    }
+
+    // get redo len
+    pub fn get_redo_len(&self) -> usize {
+        self.redo.len()
     }
 
     // load file
@@ -314,15 +349,6 @@ impl Cut {
         }
     }
 
-    // name
-    pub fn name(&self) -> String {
-        self.cut_path
-            .file_name()
-            .map_or("<TBD>".to_string(), |path| {
-                path.to_string_lossy().to_string()
-            })
-    }
-
     /// call to update cut spline when knots are changed
     pub fn cut_spline_update(&mut self) {
         // add a knot to the spline
@@ -331,7 +357,7 @@ impl Cut {
             splines::Key::new(knot.pos.x, knot.pos.y, Interpolation::CatmullRom)
         }
         trace!("update knots and spline");
-        self.needs_save = true;
+        // self.needs_save = true;
         let len = self.cut_knots.len();
         // ensure that endpoints are aligned
         self.cut_knots[0].pos.y = self.cut_knots[1].pos.y;
@@ -402,7 +428,9 @@ impl Cut {
 
         match File::create(&self.cut_path) {
             Ok(mut file) => {
-                self.needs_save = false;
+                // self.needs_save = false;
+                self.redo = vec![];
+                self.undo = vec![];
                 if let Err(err) = file.write_all(json.as_bytes()) {
                     println!("Err {:?}", err);
                     format!("{:?}", err)
