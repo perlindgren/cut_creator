@@ -262,7 +262,11 @@ impl eframe::App for App {
                             .inner_margin(egui::Margin::same(0.0)),
                     )
                     .show(ctx, |ui| {
-                        ui.label("dummy top panel, let's see what to do with that");
+                        let nr_undos = match self.cuts[self.cur_cut] {
+                            Some(ref cut) => format!("Checkpoints #{}", cut.get_checkpoints_len()),
+                            _ => "".to_string(),
+                        };
+                        ui.label(nr_undos);
                     });
 
                 // dummy bottom

@@ -37,11 +37,6 @@ enum CheckPointData {
     FaderKnots(Vec<Knot>),
 }
 
-enum Undo {
-    CutKnots,
-    FaderKnots,
-}
-
 // #[derive(Debug, Default)]
 // struct Undos(Vec<UndoData>);
 
@@ -237,6 +232,11 @@ impl Default for Cut {
 }
 
 impl Cut {
+    // get undo len
+    pub fn get_checkpoints_len(&self) -> usize {
+        self.checkpoints.len()
+    }
+
     // load file
     pub fn load_file() -> Result<Cut, String> {
         match rfd::FileDialog::new()
@@ -533,6 +533,17 @@ impl Cut {
             || response.double_clicked_by(PointerButton::Secondary)
         {
             trace!("escape");
+            if self.cut_knots.iter().any(|cut_knot| cut_knot.selected) {
+                checkpoint.push(CheckPointData::CutKnots(self.cut_knots.clone()));
+            }
+            if self
+                .fader_knots
+                .iter()
+                .any(|fader_knot| fader_knot.selected)
+            {
+                checkpoint.push(CheckPointData::FaderKnots(self.fader_knots.clone()));
+            }
+
             self.cut_knots.iter_mut().for_each(|k| k.selected = false);
             self.fader_knots.iter_mut().for_each(|k| k.selected = false);
         }
@@ -551,18 +562,28 @@ impl Cut {
             let rect = Rect::from_two_pos(self.select_start, self.select_end);
 
             // cut knots
+            let mut cut_knots_contained = false;
+            let cut_knots = self.cut_knots.clone();
             self.cut_knots.iter_mut().for_each(|cut_knot| {
                 if rect.contains(bars_to_screen * cut_knot.pos) {
+                    if !cut_knots_contained {
+                        checkpoint.push(CheckPointData::CutKnots(cut_knots.clone()));
+                        cut_knots_contained = true;
+                    }
                     cut_knot.selected ^= true;
-                    // cut_knots_checkpoint = true;
                 }
             });
 
             // fader knots
+            let mut fader_knots_contained = false;
+            let fader_knots = self.fader_knots.clone();
             self.fader_knots.iter_mut().for_each(|fader_knot| {
                 if rect.contains(bars_to_screen * fader_knot.pos) {
+                    if !fader_knots_contained {
+                        checkpoint.push(CheckPointData::FaderKnots(fader_knots.clone()));
+                        fader_knots_contained = true;
+                    }
                     fader_knot.selected ^= true;
-                    //  fader_knots_checkpoint = true;
                 }
             });
 
