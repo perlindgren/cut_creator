@@ -261,7 +261,7 @@ impl eframe::App for App {
                             .inner_margin(egui::Margin::same(0.0)),
                     )
                     .show(ctx, |ui| {
-                        let nr_undos = match self.cuts[self.cur_cut].0 {
+                        let top_panel_info = match self.cuts[self.cur_cut].0 {
                             Some(ref cut) => {
                                 // #{}: {}", i, opt_cut.get_name()
                                 format!(
@@ -274,7 +274,7 @@ impl eframe::App for App {
                             }
                             _ => "".to_string(),
                         };
-                        ui.label(nr_undos);
+                        ui.label(top_panel_info);
                     });
 
                 // dummy bottom
