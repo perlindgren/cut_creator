@@ -398,7 +398,6 @@ impl Cut {
             self.fader_spline.add(splines::Key::new(
                 self.fader_knots[len - 1].pos.x,
                 0.0,
-                // self.fader_knots[0].pos.y,
                 Interpolation::Linear,
             ));
         } else {
