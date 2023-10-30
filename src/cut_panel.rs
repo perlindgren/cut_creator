@@ -1238,7 +1238,7 @@ impl Cut {
                         }
                         CheckPointData::FaderKnot(IndexKnot { index, knot }) => {
                             println!("undo fader knot {:?}", index);
-                            redo.push(CheckPointData::CutKnot(IndexKnot {
+                            redo.push(CheckPointData::FaderKnot(IndexKnot {
                                 index,
                                 knot: self.fader_knots[index],
                             }));
@@ -1258,30 +1258,45 @@ impl Cut {
             println!("Ctrl-Z");
             // restore checkpoint
             if let Some(check_point) = self.redo.pop() {
+                let mut undo = vec![];
                 check_point
                     .into_iter()
                     .for_each(|check_point_data| match check_point_data {
                         CheckPointData::CutKnots(cut_knots) => {
                             println!("redo cut_knots {:?}", cut_knots);
+                            undo.push(CheckPointData::FaderKnots(self.cut_knots.clone()));
                             self.cut_knots = cut_knots;
                             self.cut_spline_update()
                         }
                         CheckPointData::FaderKnots(fader_knots) => {
                             println!("redo fader_knots {:?}", fader_knots);
+                            undo.push(CheckPointData::FaderKnots(self.fader_knots.clone()));
                             self.fader_knots = fader_knots;
                             self.fader_spline_update();
                         }
                         CheckPointData::CutKnot(IndexKnot { index, knot }) => {
                             println!("redo cut knot {:?}", index);
+                            undo.push(CheckPointData::CutKnot(IndexKnot {
+                                index,
+                                knot: self.cut_knots[index],
+                            }));
                             self.cut_knots[index] = knot;
                             self.cut_spline_update();
                         }
                         CheckPointData::FaderKnot(IndexKnot { index, knot }) => {
                             println!("redo fader knot {:?}", index);
+                            undo.push(CheckPointData::FaderKnot(IndexKnot {
+                                index,
+                                knot: self.fader_knots[index],
+                            }));
                             self.fader_knots[index] = knot;
                             self.fader_spline_update();
                         }
                     });
+                if !undo.is_empty() {
+                    println!("store redo checkpoint");
+                    self.undo.push(undo);
+                }
             }
         }
 
