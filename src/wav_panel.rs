@@ -158,21 +158,23 @@ impl Wav {
             assert!(self.data.offset <= wav_data.len);
         }
 
-        // undo checkpoint
-        if ui.input_mut(|i| i.consume_key(Modifiers::CTRL, Key::Z)) {
-            println!("Ctrl-Z");
-            if let Some(check_point) = self.undo.pop() {
-                self.redo.push(self.data.clone());
-                self.data = check_point;
+        if response.hovered() {
+            // undo checkpoint
+            if ui.input_mut(|i| i.consume_key(Modifiers::CTRL, Key::Z)) {
+                println!("Ctrl-Z");
+                if let Some(check_point) = self.undo.pop() {
+                    self.redo.push(self.data.clone());
+                    self.data = check_point;
+                }
             }
-        }
 
-        // redo checkpoint
-        if ui.input_mut(|i| i.consume_key(Modifiers::CTRL | Modifiers::SHIFT, Key::Z)) {
-            println!("SHIFT Ctrl-Z");
-            if let Some(check_point) = self.redo.pop() {
-                self.undo.push(self.data.clone());
-                self.data = check_point;
+            // redo checkpoint
+            if ui.input_mut(|i| i.consume_key(Modifiers::CTRL | Modifiers::SHIFT, Key::Z)) {
+                println!("SHIFT Ctrl-Z");
+                if let Some(check_point) = self.redo.pop() {
+                    self.undo.push(self.data.clone());
+                    self.data = check_point;
+                }
             }
         }
 

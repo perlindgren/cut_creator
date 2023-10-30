@@ -258,7 +258,7 @@ impl OptCut {
 impl Cut {
     // needs save if undo len > 0
     pub fn needs_save(&self) -> bool {
-        self.undo.len() > 0
+        !self.undo.is_empty()
     }
 
     // name
