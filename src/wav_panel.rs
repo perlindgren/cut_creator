@@ -59,13 +59,34 @@ impl WavData {
     }
 }
 
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
+struct CheckPointData {
+    offset: usize, // in samples, wrapping
+    len: usize,    // in samples
+}
 #[derive(Serialize, Deserialize, Debug, Default)]
 pub struct Wav {
-    offset: usize,  // in samples, wrapping
-    pub len: usize, // in samples
+    data: CheckPointData,
+
+    #[serde(skip)]
+    undo: Vec<CheckPointData>,
+    redo: Vec<CheckPointData>,
 }
 
 impl Wav {
+    /// set len
+    pub fn set_len(&mut self, len: usize) {
+        self.data.len = len
+    }
+
+    pub fn get_undo_len(&self) -> usize {
+        self.undo.len()
+    }
+
+    pub fn get_redo_len(&self) -> usize {
+        self.redo.len()
+    }
+
     /// control panel
     pub fn ui_content_ctrl(&mut self, ui: &mut Ui, wav_data: &WavData, i: usize) {
         ui.label(format!("#{}: {}", i, wav_data.filename));
@@ -73,16 +94,16 @@ impl Wav {
 
         ui.horizontal(|ui| {
             if ui.button("X").clicked() {
-                self.offset = 0;
+                self.data.offset = 0;
             }
-            ui.label(format!("offset {}", self.offset));
+            ui.label(format!("offset {}", self.data.offset));
         });
 
         ui.horizontal(|ui| {
             if ui.button("X").clicked() {
-                self.len = wav_data.len
+                self.data.len = wav_data.len
             }
-            ui.label(format!("len {}", self.len));
+            ui.label(format!("len {}", self.data.len));
         });
     }
 
@@ -110,32 +131,59 @@ impl Wav {
         let height = response.rect.height();
 
         // length
-        if response.dragged_by(PointerButton::Secondary) {
-            let delta = response.drag_delta();
-            let delta_scale = ((delta.y / height) * self.len as f32) as i32 as usize;
-
-            self.len = (self.len - delta_scale).max(10_000).min(wav_data.len);
-            assert!(self.len >= 10_000 && self.len <= wav_data.len);
+        if response.drag_started_by(PointerButton::Secondary) {
+            self.undo.push(self.data.clone());
         }
 
+        // length
+        if response.dragged_by(PointerButton::Secondary) {
+            let delta = response.drag_delta();
+            let delta_scale = ((delta.y / height) * self.data.len as f32) as i32 as usize;
+
+            self.data.len = (self.data.len - delta_scale).max(10_000).min(wav_data.len);
+            assert!(self.data.len >= 10_000 && self.data.len <= wav_data.len);
+        }
+
+        // offset
+        if response.drag_started_by(PointerButton::Primary) {
+            self.undo.push(self.data.clone());
+        }
         // offset
         if response.dragged_by(PointerButton::Primary) {
             let delta = response.drag_delta();
 
-            let delta_scale = ((delta.y / height) * self.len as f32) as i32 as usize;
+            let delta_scale = ((delta.y / height) * self.data.len as f32) as i32 as usize;
 
-            self.offset = (wav_data.len + self.offset - delta_scale) % wav_data.len;
-            assert!(self.offset <= wav_data.len);
+            self.data.offset = (wav_data.len + self.data.offset - delta_scale) % wav_data.len;
+            assert!(self.data.offset <= wav_data.len);
+        }
+
+        // undo checkpoint
+        if ui.input_mut(|i| i.consume_key(Modifiers::CTRL, Key::Z)) {
+            println!("Ctrl-Z");
+            if let Some(check_point) = self.undo.pop() {
+                self.redo.push(self.data.clone());
+                self.data = check_point;
+            }
+        }
+
+        // redo checkpoint
+        if ui.input_mut(|i| i.consume_key(Modifiers::CTRL | Modifiers::SHIFT, Key::Z)) {
+            println!("SHIFT Ctrl-Z");
+            if let Some(check_point) = self.redo.pop() {
+                self.undo.push(self.data.clone());
+                self.data = check_point;
+            }
         }
 
         // compute left/right sample
         let mut left: Vec<Pos2> = vec![];
         let mut right: Vec<Pos2> = vec![];
 
-        let step = self.len as f32 / height;
+        let step = self.data.len as f32 / height;
 
         for i in 0..height as usize {
-            let t = (((i as f32) * step) as usize + self.offset + wav_data.len) % wav_data.len;
+            let t = (((i as f32) * step) as usize + self.data.offset + wav_data.len) % wav_data.len;
             assert!(t <= wav_data.len);
 
             let l: f32 = wav_data.left[t];

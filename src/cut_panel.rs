@@ -311,7 +311,7 @@ impl Cut {
                                     ..Cut::default()
                                 };
 
-                                cut.wav.len = cut.wav_data.len;
+                                cut.wav.set_len(cut.wav_data.len);
                                 println!("path {}", path.display());
                                 cut.sample_path = Some(path.clone());
                                 path.set_extension("cut");
@@ -499,7 +499,7 @@ impl Cut {
             response.rect,
         );
 
-        // check points
+        // checkpoint
         let mut checkpoint = vec![];
 
         // panel_pos relation to bars
