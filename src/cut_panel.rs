@@ -20,7 +20,7 @@ use log::trace;
 ///
 /// The loop option forces S <-> E, which ensures that the cut can be smoothly looped.
 
-#[derive(Copy, Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Copy, Clone, Debug, Serialize, Deserialize, PartialEq, Default)]
 pub struct Knot {
     /// x position in terms of bars. 0.25 -> 1st quarter in 1st bar
     /// y position in terms of relative sample position 0.0 beginning of sample 1.0 end of sample.
@@ -35,6 +35,14 @@ pub struct Knot {
 enum CheckPointData {
     CutKnots(Vec<Knot>),
     FaderKnots(Vec<Knot>),
+    CutKnot(IndexKnot),
+    FaderKnot(IndexKnot),
+}
+
+#[derive(Debug, Default, Clone)]
+struct IndexKnot {
+    index: usize,
+    knot: Knot,
 }
 
 // #[derive(Debug, Default)]
@@ -122,6 +130,10 @@ pub struct Cut {
     /// Start positions for each fader knot
     #[serde(skip)]
     move_fader_initial: Vec<Knot>,
+
+    /// initial position for single knot drag
+    #[serde(skip)]
+    move_knot_initial: IndexKnot,
 
     /// Cursor
     #[serde(skip)]
@@ -223,6 +235,7 @@ impl Default for Cut {
             move_last: Pos2::ZERO,
             move_cut_initial: vec![],
             move_fader_initial: vec![],
+            move_knot_initial: IndexKnot::default(),
             cursor: None,
             value: None,
             looping: false,
@@ -752,8 +765,17 @@ impl Cut {
 
                 let point_response = ui.interact(point_rect, point_id, Sense::drag());
 
+                if point_response.drag_started() {
+                    println!("started - undo cut_knots");
+                    self.move_knot_initial = IndexKnot {
+                        index: i + 1,
+                        knot: *k,
+                    };
+                }
+
                 if point_response.drag_released() {
                     println!("released - undo cut_knots");
+                    checkpoint.push(CheckPointData::CutKnot(self.move_knot_initial.clone()));
                 }
 
                 if point_response.dragged() {
@@ -823,9 +845,14 @@ impl Cut {
 
                 let point_response = ui.interact(point_rect, point_id, Sense::drag());
 
+                if point_response.drag_started() {
+                    println!("started - undo fader_knots");
+                    self.move_knot_initial = IndexKnot { index: i, knot: *k };
+                }
+
                 if point_response.drag_released() {
                     println!("released - undo fader_knots");
-                    // fader_knots_checkpoint = true;
+                    checkpoint.push(CheckPointData::FaderKnot(self.move_knot_initial.clone()));
                 }
 
                 if point_response.dragged() {
@@ -1164,6 +1191,16 @@ impl Cut {
                         CheckPointData::FaderKnots(fader_knots) => {
                             println!("restore {:?}", fader_knots);
                             self.fader_knots = fader_knots;
+                            self.fader_spline_update();
+                        }
+                        CheckPointData::CutKnot(IndexKnot { index, knot }) => {
+                            println!("restore cut knot {:?}", index);
+                            self.cut_knots[index] = knot;
+                            self.cut_spline_update();
+                        }
+                        CheckPointData::FaderKnot(IndexKnot { index, knot }) => {
+                            println!("restore fader knot {:?}", index);
+                            self.fader_knots[index] = knot;
                             self.fader_spline_update();
                         }
                     });
