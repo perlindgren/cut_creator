@@ -943,6 +943,8 @@ impl Cut {
             // insert, or move
             let cp = self.cut_knots.clone().into_iter();
 
+            checkpoint.push(CheckPointData::CutKnots(self.cut_knots.clone()));
+
             if self
                 .cut_knots
                 .iter_mut()
@@ -985,6 +987,8 @@ impl Cut {
 
             // insert, or move
             let fader_knots = self.fader_knots.clone().into_iter();
+
+            checkpoint.push(CheckPointData::FaderKnots(self.fader_knots.clone()));
 
             println!("new fader knot point");
             let (head, mut tail): (Vec<_>, Vec<_>) = fader_knots.partition(|k| pos.x < k.pos.x);
@@ -1217,7 +1221,7 @@ impl Cut {
                     .for_each(|check_point_data| match check_point_data {
                         CheckPointData::CutKnots(cut_knots) => {
                             println!("undo cut_knots {:?}", cut_knots);
-                            redo.push(CheckPointData::FaderKnots(self.cut_knots.clone()));
+                            redo.push(CheckPointData::CutKnots(self.cut_knots.clone()));
                             self.cut_knots = cut_knots;
                             self.cut_spline_update()
                         }
@@ -1264,7 +1268,7 @@ impl Cut {
                     .for_each(|check_point_data| match check_point_data {
                         CheckPointData::CutKnots(cut_knots) => {
                             println!("redo cut_knots {:?}", cut_knots);
-                            undo.push(CheckPointData::FaderKnots(self.cut_knots.clone()));
+                            undo.push(CheckPointData::CutKnots(self.cut_knots.clone()));
                             self.cut_knots = cut_knots;
                             self.cut_spline_update()
                         }
