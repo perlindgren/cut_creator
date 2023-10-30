@@ -20,7 +20,7 @@ use log::trace;
 ///
 /// The loop option forces S <-> E, which ensures that the cut can be smoothly looped.
 
-#[derive(Copy, Clone, Debug, Serialize, Deserialize)]
+#[derive(Copy, Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct Knot {
     /// x position in terms of bars. 0.25 -> 1st quarter in 1st bar
     /// y position in terms of relative sample position 0.0 beginning of sample 1.0 end of sample.
@@ -117,11 +117,11 @@ pub struct Cut {
 
     /// Start positions for each cut knot
     #[serde(skip)]
-    move_cut_initial_pos: Vec<Pos2>,
+    move_cut_initial: Vec<Knot>,
 
     /// Start positions for each fader knot
     #[serde(skip)]
-    move_fader_initial_pos: Vec<Pos2>,
+    move_fader_initial: Vec<Knot>,
 
     /// Cursor
     #[serde(skip)]
@@ -221,8 +221,8 @@ impl Default for Cut {
             move_drag: false,
             move_start: Pos2::ZERO,
             move_last: Pos2::ZERO,
-            move_cut_initial_pos: vec![],
-            move_fader_initial_pos: vec![],
+            move_cut_initial: vec![],
+            move_fader_initial: vec![],
             cursor: None,
             value: None,
             looping: false,
@@ -457,9 +457,6 @@ impl Cut {
         // check points
         let mut checkpoint = vec![];
 
-        // let mut fader_knots_checkpoint = false;
-        // let mut cut_knots_checkpoint = false;
-
         // panel_pos relation to bars
         let width = response.rect.width();
         let segments = self.bars * self.quantization as f32;
@@ -587,7 +584,6 @@ impl Cut {
                 }
             });
 
-            // cut_update = true;
             self.select_drag = false;
         }
 
@@ -614,16 +610,20 @@ impl Cut {
             self.move_drag = true;
             self.move_start = response.interact_pointer_pos().unwrap();
             self.move_last = self.move_start;
-            self.move_cut_initial_pos = self.cut_knots.iter().map(|k| k.pos).collect();
-            self.move_fader_initial_pos = self.fader_knots.iter().map(|k| k.pos).collect();
+            self.move_cut_initial = self.cut_knots.clone();
+            self.move_fader_initial = self.fader_knots.clone();
             trace!("start move {:?}", self.move_start);
         }
 
         if response.drag_released_by(PointerButton::Primary) {
             self.move_drag = true;
             trace!("end move");
-            // cut_knots_checkpoint = true;
-            // fader_knots_checkpoint = true;
+            if self.cut_knots != self.move_cut_initial {
+                checkpoint.push(CheckPointData::CutKnots(self.move_cut_initial.clone()));
+            }
+            if self.fader_knots != self.move_fader_initial {
+                checkpoint.push(CheckPointData::FaderKnots(self.move_fader_initial.clone()));
+            }
             self.move_drag = false;
         }
 
@@ -646,7 +646,7 @@ impl Cut {
                 // exclude first 2 and last 2 knots, they have fixed x positions
                 for i in (2..cut_knots.len() - 2).rev() {
                     if self.cut_knots[i].selected {
-                        let knot_pos_x = ((self.move_cut_initial_pos[i].x + bar_rel.x)
+                        let knot_pos_x = ((self.move_cut_initial[i].pos.x + bar_rel.x)
                             * (self.quantization as f32))
                             .round()
                             / (self.quantization as f32);
@@ -664,7 +664,7 @@ impl Cut {
                 // exclude first and last knots, they have fixed x positions
                 for i in (1..fader_knots.len() - 1).rev() {
                     if self.fader_knots[i].selected {
-                        let knot_pos_x = ((self.move_fader_initial_pos[i].x + bar_rel.x)
+                        let knot_pos_x = ((self.move_fader_initial[i].pos.x + bar_rel.x)
                             * (self.quantization as f32))
                             .round()
                             / (self.quantization as f32);
@@ -684,7 +684,7 @@ impl Cut {
                 // we exclude first 2 and last 2 knots, they have fixed positions
                 for i in 2..cut_knots.len() - 2 {
                     if self.cut_knots[i].selected {
-                        let knot_pos_x = ((self.move_cut_initial_pos[i].x + bar_rel.x)
+                        let knot_pos_x = ((self.move_cut_initial[i].pos.x + bar_rel.x)
                             * (self.quantization as f32))
                             .round()
                             / (self.quantization as f32);
@@ -702,7 +702,7 @@ impl Cut {
                 // we exclude first and last knots, they have fixed positions
                 for i in 1..fader_knots.len() - 1 {
                     if self.fader_knots[i].selected {
-                        let knot_pos_x = ((self.move_fader_initial_pos[i].x + bar_rel.x)
+                        let knot_pos_x = ((self.move_fader_initial[i].pos.x + bar_rel.x)
                             * (self.quantization as f32))
                             .round()
                             / (self.quantization as f32);
@@ -719,7 +719,7 @@ impl Cut {
             // cut knots up/down
             for i in 1..cut_knots.len() - 1 {
                 if self.cut_knots[i].selected {
-                    self.cut_knots[i].pos.y = (self.move_cut_initial_pos[i].y + bar_rel.y)
+                    self.cut_knots[i].pos.y = (self.move_cut_initial[i].pos.y + bar_rel.y)
                         .min(1.0)
                         .max(0.0);
                 }
@@ -727,7 +727,6 @@ impl Cut {
         }
 
         // cut knots
-        let mut cut_knots_check_point = false;
         let control_point_radius = 8.0;
         let cut_knot_shapes: Vec<Shape> = self.cut_knots[1..if self.looping {
             cut_knots.len() - 2
@@ -755,7 +754,6 @@ impl Cut {
 
                 if point_response.drag_released() {
                     println!("released - undo cut_knots");
-                    cut_knots_check_point = true;
                 }
 
                 if point_response.dragged() {
