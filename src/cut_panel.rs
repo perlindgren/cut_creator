@@ -1,5 +1,6 @@
 use crate::{
     config::Config,
+    sinc,
     wav_panel::{Wav, WavData},
 };
 use egui::epaint::PathShape;
@@ -256,6 +257,11 @@ impl OptCut {
 }
 
 impl Cut {
+    // Sample spline
+    pub fn sample_spline(self, bar_pos: f32) -> Option<f32> {
+        self.cut_spline.clamped_sample(bar_pos)
+    }
+
     // needs save if undo len > 0
     pub fn needs_save(&self) -> bool {
         !self.undo.is_empty() || self.wav.needs_save()
@@ -470,10 +476,7 @@ impl Cut {
             self.fader_spline_update();
         }
 
-        if ui
-            .button("Save Cut")
-            // TODO
-            .clicked()
+        if ui.button("Save Cut").clicked()
             || ui.input_mut(|i| i.consume_key(Modifiers::CTRL, Key::S))
         {
             *status = self.save_cut();
@@ -481,6 +484,10 @@ impl Cut {
 
         if ui.input_mut(|i| i.consume_key(Modifiers::CTRL | Modifiers::SHIFT, Key::S)) {
             *status = self.save_cut_dialogue();
+        }
+
+        if ui.button("Sample").clicked() {
+            sinc::sinc_resample(self);
         }
     }
 
