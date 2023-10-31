@@ -1,15 +1,3 @@
-// % sinc(x) = sin(pi*x)/(pi*x), sinc(0)=1
-// step=.1; % cutoff is f = step*Fs/2
-// limit=step*40; % increase to reduce ripples
-// c=[]; i=1;
-// for x = -limit : step : +limit,
-// if abs(x)>0,c(i)=sin(pi*x)/(pi*x);
-// else
-//  c(i)=1;
-// end;
-// i=i+1;
-// end;
-
 use std::f32::consts::PI;
 
 fn sinc(x: f32) -> f32 {
@@ -36,8 +24,9 @@ fn main() {
     let nr_sinc_samples = 10;
     let first_sinc_sample = nr_sinc_samples / 2;
 
-    let ratio = 10.0;
+    let mut ratio = 1.0;
     for i in 0..sample_rate * time {
+        ratio *= 1.0001;
         // recreate sample at time t
         let t = i as f32 * ratio;
         let min_t = t.floor(); // the sample left of the one to re-create

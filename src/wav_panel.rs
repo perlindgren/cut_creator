@@ -10,7 +10,7 @@ use log::trace;
 
 #[derive(Default, Debug)]
 pub struct WavData {
-    _header: Header,
+    header: Header,
     _stereo: Vec<f32>,
     left: Vec<f32>,
     right: Vec<f32>,
@@ -24,8 +24,8 @@ impl WavData {
     /// load
     pub fn load_wav_data(path: PathBuf) -> Result<Self, String> {
         let mut inp_file = File::open(&path).map_err(|err| err.to_string())?;
-        let (_header, data) = wav::read(&mut inp_file).unwrap();
-        trace!("header {:?}", _header);
+        let (header, data) = wav::read(&mut inp_file).unwrap();
+        trace!("header {:?}", header);
 
         let _stereo = match data {
             BitDepth::ThirtyTwoFloat(v) => {
@@ -49,13 +49,17 @@ impl WavData {
         let filename = path.file_stem().unwrap().to_str().unwrap().to_owned();
 
         Ok(WavData {
-            _header,
+            header,
             _stereo,
             left,
             right,
             len,
             filename,
         })
+    }
+
+    pub fn get_header(&self) -> Header {
+        self.header
     }
 }
 
