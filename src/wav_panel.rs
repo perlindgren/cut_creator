@@ -88,11 +88,11 @@ impl Wav {
     /// get_sample at v, where p = 0..data.len
     pub fn get_sample(&self, p: usize, wav_data: &WavData) -> (f32, f32) {
         let t = p + self.data.offset;
-        if t < self.data.len {
+        // if t < self.data.len {
             wav_data.get_sample(t)
-        } else {
-            (0.0, 0.0)
-        }
+        // } else {
+        //     (0.0, 0.0)
+        // }
     }
 
     /// Get offset

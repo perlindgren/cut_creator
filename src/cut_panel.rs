@@ -257,8 +257,8 @@ impl OptCut {
 }
 
 impl Cut {
-    // Sample spline
-    pub fn sample_spline(self, bar_pos: f32) -> Option<f32> {
+    // Sample spline in bars
+    pub fn sample_spline(&self, bar_pos: f32) -> Option<f32> {
         self.cut_spline.clamped_sample(bar_pos)
     }
 

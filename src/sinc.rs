@@ -34,7 +34,7 @@ pub fn sinc_resample(cut: &Cut) {
     let in_len = cut.wav.get_data_len();
     println!("in_len {}", in_len);
     let in_out = in_len as f32 / out_samples;
-    println!("in_out {}", in_len);
+    println!("in_out {}", in_out);
 
     let nr_sinc_samples = 10;
     let first_sinc_sample = nr_sinc_samples / 2;
@@ -43,8 +43,12 @@ pub fn sinc_resample(cut: &Cut) {
 
     let mut out = vec![];
     for i in 0..out_samples as usize {
+        // time in bars
+        let t_bars = bars * i as f32 / out_samples;
         // recreate sample at time t
-        let t = i as f32 * in_out;
+        let t_0_1 = cut.sample_spline(t_bars).unwrap();
+
+        let t = t_0_1 * in_len as f32;
 
         let min_t = t.floor(); // the sample left of the one to re-create
         let diff = t - min_t;
