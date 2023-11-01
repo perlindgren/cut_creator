@@ -1,5 +1,6 @@
 use std::f32::consts::PI;
 
+// normalized sinc, 0 at 1
 fn sinc(x: f32) -> f32 {
     if x != 0.0 {
         (x * PI).sin() / (x * PI)
@@ -21,10 +22,11 @@ fn main() {
 
     let mut re_sample = vec![];
 
-    let nr_sinc_samples = 10;
-    let first_sinc_sample = nr_sinc_samples / 2;
+    let nr_sinc_samples = 11;
+    let first_sinc_sample = (nr_sinc_samples - 1) / 2;
+    println!("{}", first_sinc_sample);
 
-    let mut ratio = 0.01;
+    let ratio = 0.01;
     for i in 0..sample_rate * time {
         // ratio *= 1.0001;
         // recreate sample at time t
@@ -34,7 +36,7 @@ fn main() {
 
         let mut s = 0.0;
         for j in 0..=nr_sinc_samples {
-            let sample_position = j + min_t as usize - first_sinc_sample;
+            let sample_position = j - first_sinc_sample + min_t as usize;
             if let Some(in_sample) = sample.get(sample_position) {
                 s += sinc((j as f32 - first_sinc_sample as f32) - diff) * in_sample;
             }
