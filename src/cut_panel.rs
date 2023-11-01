@@ -262,6 +262,10 @@ impl Cut {
         self.cut_spline.clamped_sample(bar_pos)
     }
 
+    pub fn get_bars(&self) -> f32 {
+        self.bars
+    }
+
     // needs save if undo len > 0
     pub fn needs_save(&self) -> bool {
         !self.undo.is_empty() || self.wav.needs_save()
@@ -317,7 +321,7 @@ impl Cut {
                                     ..Cut::default()
                                 };
 
-                                cut.wav.set_len(cut.wav_data.len);
+                                cut.wav.set_data_len(cut.wav_data.len);
                                 println!("path {}", path.display());
                                 cut.sample_path = Some(path.clone());
                                 path.set_extension("cut");

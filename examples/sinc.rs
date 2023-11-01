@@ -24,9 +24,9 @@ fn main() {
     let nr_sinc_samples = 10;
     let first_sinc_sample = nr_sinc_samples / 2;
 
-    let mut ratio = 1.0;
+    let mut ratio = 0.01;
     for i in 0..sample_rate * time {
-        ratio *= 1.0001;
+        // ratio *= 1.0001;
         // recreate sample at time t
         let t = i as f32 * ratio;
         let min_t = t.floor(); // the sample left of the one to re-create
@@ -34,7 +34,7 @@ fn main() {
 
         let mut s = 0.0;
         for j in 0..=nr_sinc_samples {
-            let sample_position = min_t as usize - first_sinc_sample;
+            let sample_position = j + min_t as usize - first_sinc_sample;
             if let Some(in_sample) = sample.get(sample_position) {
                 s += sinc((j as f32 - first_sinc_sample as f32) - diff) * in_sample;
             }
@@ -49,7 +49,7 @@ fn main() {
         sample_format: hound::SampleFormat::Float,
     };
 
-    let mut writer = hound::WavWriter::create("./audio/sine.wav", spec).unwrap();
+    let mut writer = hound::WavWriter::create("./audio/sinc_out.wav", spec).unwrap();
     for (s1, s2) in sample.clone().iter().zip(re_sample) {
         writer.write_sample(*s1).unwrap();
         writer.write_sample(s2).unwrap();

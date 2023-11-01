@@ -61,6 +61,13 @@ impl WavData {
     pub fn get_header(&self) -> Header {
         self.header
     }
+
+    pub fn get_sample(&self, index: usize) -> (f32, f32) {
+        (
+            *self.left.get(index).unwrap_or(&0.0),
+            *self.right.get(index).unwrap_or(&0.0),
+        )
+    }
 }
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
@@ -78,29 +85,53 @@ pub struct Wav {
 }
 
 impl Wav {
+    /// get_sample at v, where p = 0..data.len
+    pub fn get_sample(&self, p: usize, wav_data: &WavData) -> (f32, f32) {
+        let t = p + self.data.offset;
+        if t < self.data.len {
+            wav_data.get_sample(t)
+        } else {
+            (0.0, 0.0)
+        }
+    }
+
+    /// Get offset
+    pub fn get_data_offset(&self) -> usize {
+        self.data.offset
+    }
+
     /// set len
-    pub fn set_len(&mut self, len: usize) {
+    pub fn set_data_len(&mut self, len: usize) {
         self.data.len = len
     }
 
+    /// Get data len
+    pub fn get_data_len(&self) -> usize {
+        self.data.len
+    }
+
+    /// Get undo len
     pub fn get_undo_len(&self) -> usize {
         self.undo.len()
     }
 
+    /// Get redo len
     pub fn get_redo_len(&self) -> usize {
         self.redo.len()
     }
 
+    /// Needs save
     pub fn needs_save(&self) -> bool {
         !self.undo.is_empty()
     }
 
+    /// Clear undo redo buffers
     pub fn clear_undo_redo(&mut self) {
         self.undo = vec![];
         self.redo = vec![];
     }
 
-    /// control panel
+    /// Control panel for the Wav
     pub fn ui_content_ctrl(&mut self, ui: &mut Ui, wav_data: &WavData, i: usize) {
         ui.label(format!("#{}: {}", i, wav_data.filename));
         // ui.label(format!("{}", self.path.display()));
