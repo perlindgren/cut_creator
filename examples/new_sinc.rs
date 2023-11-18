@@ -22,15 +22,33 @@ fn main() {
 
     // let mut re_sample = vec![];
 
-    let ratio: f32 = 0.5;
-    let dt = 3.0;
+    let ratio: f32 = 2.0;
+    let dt = 5.0;
     let s = if ratio < 1.0 { 1.0 } else { 1.0 / ratio };
 
     // sinc stretch factor
-    let stretch = (dt * s).floor() as i32;
+    let stretch = (dt / s).floor() as i32;
     let x1 = -stretch;
     let x2 = stretch;
-    println!("{}..{}", x1, x2);
+    println!("s {} {}..{}", s, x1, x2);
+
+    let mut n = 0.0;
+
+    for x in x1..=x2 {
+        // ts=0.9*(t(k1)-t2(k2) )/s;   %time of each input sample relative to output sample time, stretched to make filter roll off slighty earlier to suppress folding from tones close to fs/2
+        let ts = x as f32 * ratio / s;
+        // w1=sinc(ts);		%low-pass filter
+        let w1 = sinc(ts);
+        // w2=(1+cos( pi* ts/dt) );	%window function (hann)
+        let w2 = 1.0 + (PI * ts / dt).cos();
+        println!("x {}, ts {}, w1 {}, w2 {}", x, ts, w1, w2);
+
+        // d=d+u(k1)*w1*w2;
+        // n=n+w1*w2;
+        n += w1 * w2;
+    }
+
+    println!("n {}", n);
 
     // println!("first_sinc_sample {}", first_sinc_sample);
     // println!("ratio {}", ratio);
