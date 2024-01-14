@@ -9,7 +9,7 @@ fn main() -> Result<(), eframe::Error> {
     env_logger::init(); // Log to stderr (if you run with `RUST_LOG=debug`).
 
     let options = eframe::NativeOptions {
-        initial_window_size: Some(egui::vec2(600.0, 400.0)),
+        viewport: egui::ViewportBuilder::default().with_inner_size([600.0, 400.0]),
         ..Default::default()
     };
     eframe::run_native("Wav Plot", options, Box::new(|_cc| Box::<MyApp>::default()))

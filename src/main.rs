@@ -15,8 +15,11 @@ fn main() -> Result<(), eframe::Error> {
     env_logger::init(); // Log to stderr (if you run with `RUST_LOG=debug`).
 
     let options = eframe::NativeOptions {
-        initial_window_size: Some(egui::vec2(1000.0, 500.0)),
-        min_window_size: Some(Vec2::new(400.0, 200.0)),
+        // initial_window_size: Some(egui::vec2(1000.0, 500.0)),
+        viewport: egui::ViewportBuilder::default()
+            .with_inner_size([1000.0, 600.0])
+            .with_min_inner_size([400.0, 200.0]),
+
         ..Default::default()
     };
 
@@ -86,25 +89,24 @@ impl eframe::App for App {
         file.write_all(json.as_bytes()).unwrap();
     }
 
-    /// on close event
-    fn on_close_event(&mut self) -> bool {
-        trace!("close");
-        if self.cuts.iter().any(|opt_cut| {
-            if let Some(ref cut) = opt_cut.0 {
-                cut.needs_save()
-            } else {
-                false
-            }
-        }) {
-            self.show_confirmation_dialog = true;
-            self.allowed_to_close
-        } else {
-            true
-        }
-    }
-
     /// update
     fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
+        // close?
+        if ctx.input(|i| i.viewport().close_requested())
+            && !self.allowed_to_close // not allowed to close
+            && self.cuts.iter().any(|opt_cut| { // unsaved work?
+                if let Some(ref cut) = opt_cut.0 {
+                    cut.needs_save()
+                } else {
+                    false
+                }
+            })
+        {
+            // we hav unsaved cuts, so cancel the close event
+            ctx.send_viewport_cmd(egui::ViewportCommand::CancelClose);
+            self.show_confirmation_dialog = true;
+        }
+
         // close dialog
         if self.show_confirmation_dialog {
             // Show confirmation dialog:
@@ -122,7 +124,7 @@ impl eframe::App for App {
 
                         if ui.button("Quit").clicked() {
                             self.allowed_to_close = true;
-                            frame.close();
+                            ui.ctx().send_viewport_cmd(egui::ViewportCommand::Close);
                         }
                     });
                 });

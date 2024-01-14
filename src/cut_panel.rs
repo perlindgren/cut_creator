@@ -1268,7 +1268,7 @@ impl Cut {
 
         // redo checkpoint
         if ui.input_mut(|i| i.consume_key(Modifiers::CTRL | Modifiers::SHIFT, Key::Z)) {
-            println!("Ctrl-Z");
+            println!("Shift Ctrl-Z");
             // restore checkpoint
             if let Some(check_point) = self.redo.pop() {
                 let mut undo = vec![];

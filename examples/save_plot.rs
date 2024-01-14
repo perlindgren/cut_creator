@@ -7,7 +7,7 @@ fn main() -> Result<(), eframe::Error> {
     env_logger::init(); // Log to stderr (if you run with `RUST_LOG=debug`).
 
     let options = eframe::NativeOptions {
-        initial_window_size: Some(egui::vec2(350.0, 400.0)),
+        viewport: egui::ViewportBuilder::default().with_inner_size([350.0, 400.0]),
         ..Default::default()
     };
     eframe::run_native(
@@ -39,7 +39,7 @@ impl eframe::App for MyApp {
             ui.add_space(border_y);
 
             if ui.button("Save Plot").clicked() {
-                frame.request_screenshot();
+                //    frame.request_screenshot();
             }
 
             // add some whitespace in y direction
@@ -75,25 +75,25 @@ impl eframe::App for MyApp {
                 // for a full size application, we should put this in a different thread,
                 // so that the GUI doesn't lag during saving
 
-                let pixels_per_point = frame.info().native_pixels_per_point;
-                let plot = screenshot.region(&plot_location, pixels_per_point);
+                //    let pixels_per_point = frame.info().native_pixels_per_point;
+                //    let plot = screenshot.region(&plot_location, pixels_per_point);
                 // save the plot to png
-                image::save_buffer(
-                    &path,
-                    plot.as_raw(),
-                    plot.width() as u32,
-                    plot.height() as u32,
-                    image::ColorType::Rgba8,
-                )
-                .unwrap();
+                // image::save_buffer(
+                //     &path,
+                //     plot.as_raw(),
+                //     plot.width() as u32,
+                //     plot.height() as u32,
+                //     image::ColorType::Rgba8,
+                // )
+                // .unwrap();
             }
         }
     }
 
-    fn post_rendering(&mut self, _screen_size_px: [u32; 2], frame: &eframe::Frame) {
-        // this is inspired by the Egui screenshot example
-        if let Some(screenshot) = frame.screenshot() {
-            self.screenshot = Some(screenshot);
-        }
-    }
+    // fn post_rendering(&mut self, _screen_size_px: [u32; 2], frame: &eframe::Frame) {
+    //     // this is inspired by the Egui screenshot example
+    //     if let Some(screenshot) = frame.screenshot() {
+    //         self.screenshot = Some(screenshot);
+    //     }
+    // }
 }

@@ -6,7 +6,7 @@ use egui_extras::{Size, StripBuilder};
 fn main() -> Result<(), eframe::Error> {
     env_logger::init(); // Log to stderr (if you run with `RUST_LOG=debug`).
     let options = eframe::NativeOptions {
-        initial_window_size: Some(egui::vec2(320.0, 240.0)),
+        viewport: egui::ViewportBuilder::default().with_inner_size([320.0, 240.0]),
         ..Default::default()
     };
     eframe::run_native(
@@ -30,9 +30,7 @@ impl eframe::App for MyApp {
                     strip.cell(|ui| {
                         ui.label("Fixed");
                     });
-                    // strip.cell(|ui| {
-                    //     ui.label("Another");
-                    // });
+
                     // We add a nested strip in the bottom cell:
                     strip.strip(|builder| {
                         builder
