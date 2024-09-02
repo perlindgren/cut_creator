@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 // use wav::{BitDepth, Header};
 use hound::WavSpec;
-use log::trace;
+use log::{debug, trace};
 
 #[derive(Default, Debug)]
 pub struct WavData {
@@ -46,7 +46,7 @@ impl WavData {
                 });
 
         let len = reader.duration() as usize;
-        trace!("len samples{}", len);
+        trace!("duration: len samples {}", len);
 
         Ok(WavData {
             wav_spec: Some(wav_spec),
@@ -88,11 +88,7 @@ impl Wav {
     /// get_sample at v, where p = 0..data.len
     pub fn get_sample(&self, p: usize, wav_data: &WavData) -> (f32, f32) {
         let t = p + self.data.offset;
-        // if t < self.data.len {
         wav_data.get_sample(t)
-        // } else {
-        //     (0.0, 0.0)
-        // }
     }
 
     /// Get offset
@@ -176,11 +172,13 @@ impl Wav {
 
         // length
         if response.drag_started_by(PointerButton::Secondary) {
+            debug!("length drag_started_by");
             self.undo.push(self.data.clone());
         }
 
         // length
         if response.dragged_by(PointerButton::Secondary) {
+            trace!("length dragged_by");
             let delta = response.drag_delta();
             let delta_scale = ((delta.y / height) * self.data.len as f32) as i32 as usize;
 
@@ -190,10 +188,12 @@ impl Wav {
 
         // offset
         if response.drag_started_by(PointerButton::Primary) {
+            debug!("offset drag_started_by");
             self.undo.push(self.data.clone());
         }
         // offset
         if response.dragged_by(PointerButton::Primary) {
+            trace!("offset dragged_by");
             let delta = response.drag_delta();
 
             let delta_scale = ((delta.y / height) * self.data.len as f32) as i32 as usize;
@@ -205,7 +205,7 @@ impl Wav {
         if response.hovered() {
             // undo checkpoint
             if ui.input_mut(|i| i.consume_key(Modifiers::CTRL, Key::Z)) {
-                println!("Ctrl-Z");
+                debug!("Ctrl-Z");
                 if let Some(check_point) = self.undo.pop() {
                     self.redo.push(self.data.clone());
                     self.data = check_point;
@@ -214,7 +214,7 @@ impl Wav {
 
             // redo checkpoint
             if ui.input_mut(|i| i.consume_key(Modifiers::CTRL | Modifiers::SHIFT, Key::Z)) {
-                println!("SHIFT Ctrl-Z");
+                debug!("SHIFT Ctrl-Z");
                 if let Some(check_point) = self.redo.pop() {
                     self.undo.push(self.data.clone());
                     self.data = check_point;

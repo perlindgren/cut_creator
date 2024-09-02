@@ -11,7 +11,7 @@ use splines::{Interpolation, Spline};
 use serde::{Deserialize, Serialize};
 use std::{fs::File, io::prelude::*, path::PathBuf};
 
-use log::trace;
+use log::{debug, trace};
 /// cut_panel
 ///
 /// A cut is defined by a spline with CatmullRom interpolation.
@@ -300,9 +300,12 @@ impl Cut {
     }
 
     // load file
-    pub fn load_file() -> Result<Cut, String> {
+    pub fn load_file() -> Result<(Cut, &'static str), String> {
         match rfd::FileDialog::new()
-            .add_filter("wav", &["wav", "cut"])
+            .add_filter("wav/cut", &["wav", "cut"])
+            .add_filter("wav", &["wav"])
+            .add_filter("cut", &["cut"])
+            .add_filter(".*", &["*"])
             .set_directory("./audio/")
             .pick_file()
         {
@@ -315,21 +318,21 @@ impl Cut {
                         match ext.to_str() {
                             Some("wav") => {
                                 // loading wav only, set the cut to default
-                                trace!("load wav");
+                                debug!("load wav (only)");
                                 let mut cut = Cut {
                                     wav_data: WavData::load_wav_data(path.clone())?,
                                     ..Cut::default()
                                 };
 
                                 cut.wav.set_data_len(cut.wav_data.len);
-                                println!("path {}", path.display());
+                                debug!("path {}", path.display());
                                 cut.sample_path = Some(path.clone());
                                 path.set_extension("cut");
                                 cut.cut_path = path;
-                                Ok(cut)
+                                Ok((cut, "wav"))
                             }
                             Some("cut") => {
-                                trace!("load cut");
+                                debug!("load cut");
                                 if let Ok(mut file) = File::open(path) {
                                     let mut json = String::new();
                                     file.read_to_string(&mut json).unwrap();
@@ -343,7 +346,7 @@ impl Cut {
                                     cut.cut_spline_update();
                                     cut.fader_spline_update();
 
-                                    Ok(cut)
+                                    Ok((cut, "cut"))
                                 } else {
                                     Err("Could not load file".to_string())
                                 }
@@ -415,7 +418,7 @@ impl Cut {
             self.fader_spline
                 .add(splines::Key::new(pos.x, pos.y, Interpolation::Linear));
         }
-        println!("spline update {:?}", self.fader_spline);
+        debug!("spline update {:?}", self.fader_spline);
     }
 
     /// get the cursor position
@@ -432,7 +435,7 @@ impl Cut {
     fn save_cut(&mut self) -> String {
         // Serialize it to a JSON string.
         let json = serde_json::to_string(&self).unwrap();
-        trace!("cut json {}", json);
+        debug!("save_cut {}", json);
 
         match File::create(&self.cut_path) {
             Ok(mut file) => {
@@ -440,7 +443,7 @@ impl Cut {
                 self.undo = vec![];
                 self.wav.clear_undo_redo();
                 if let Err(err) = file.write_all(json.as_bytes()) {
-                    println!("Err {:?}", err);
+                    debug!("Err {:?}", err);
                     format!("{:?}", err)
                 } else {
                     format!("Cut saved to {:?}", self.cut_path)
@@ -456,7 +459,7 @@ impl Cut {
     /// TODO: Does sometimes not pop-up under existing windows
     fn save_cut_dialogue(&mut self) -> String {
         let directory = self.cut_path.parent().unwrap();
-        trace!("directory : {:?}", directory);
+        debug!("directory : {:?}", directory);
         let file_name = self.cut_path.file_name().unwrap().to_string_lossy();
         if let Some(path) = rfd::FileDialog::new()
             .add_filter("cut", &["cut"])
@@ -464,7 +467,7 @@ impl Cut {
             .set_file_name(file_name)
             .save_file()
         {
-            trace!("cut path {:?}", path);
+            debug!("cut path {:?}", path);
             self.cut_path = path;
             self.save_cut()
         } else {
@@ -553,7 +556,7 @@ impl Cut {
             });
 
             if delete_any {
-                println!("delete cut knots");
+                debug!("delete cut knots");
                 checkpoint.push(CheckPointData::CutKnots(self.cut_knots.clone()));
                 self.cut_knots = cut_knots;
             }
@@ -573,7 +576,7 @@ impl Cut {
             });
 
             if delete_any {
-                println!("delete fader knots");
+                debug!("delete fader knots");
                 checkpoint.push(CheckPointData::FaderKnots(self.fader_knots.clone()));
                 self.fader_knots = fader_knots;
             }
@@ -584,7 +587,7 @@ impl Cut {
         if ui.input(|i| i.key_pressed(egui::Key::Escape))
             || response.double_clicked_by(PointerButton::Secondary)
         {
-            trace!("escape");
+            debug!("escape or double right click");
             if self.cut_knots.iter().any(|cut_knot| cut_knot.selected) {
                 checkpoint.push(CheckPointData::CutKnots(self.cut_knots.clone()));
             }
@@ -602,7 +605,7 @@ impl Cut {
 
         if response.drag_started_by(PointerButton::Secondary) {
             let pos = response.interact_pointer_pos().unwrap();
-            trace!("select start {:?}", pos);
+            debug!("select start {:?}", pos);
             self.select_start = pos;
             self.select_end = pos;
             self.select_drag = true;
@@ -610,7 +613,7 @@ impl Cut {
 
         if response.drag_stopped_by(PointerButton::Secondary) {
             let pos = response.interact_pointer_pos().unwrap();
-            trace!("select end {:?} ", pos);
+            debug!("select end {:?} ", pos);
             let rect = Rect::from_two_pos(self.select_start, self.select_end);
 
             // cut knots
@@ -807,7 +810,7 @@ impl Cut {
                 let point_response = ui.interact(point_rect, point_id, Sense::drag());
 
                 if point_response.drag_started() {
-                    println!("started - undo cut_knots");
+                    debug!("started - undo cut_knots");
                     self.move_knot_initial = IndexKnot {
                         index: i + 1,
                         knot: *k,
@@ -815,7 +818,7 @@ impl Cut {
                 }
 
                 if point_response.drag_stopped() {
-                    println!("released - undo cut_knots");
+                    debug!("released - undo cut_knots");
                     checkpoint.push(CheckPointData::CutKnot(self.move_knot_initial.clone()));
                 }
 
@@ -887,34 +890,35 @@ impl Cut {
                 let point_response = ui.interact(point_rect, point_id, Sense::drag());
 
                 if point_response.drag_started() {
-                    println!("started - undo fader_knots");
+                    debug!("started - undo fader_knots");
                     self.move_knot_initial = IndexKnot { index: i, knot: *k };
                 }
 
                 if point_response.drag_stopped() {
-                    println!("released - undo fader_knots");
+                    debug!("released - undo fader_knots");
                     checkpoint.push(CheckPointData::FaderKnot(self.move_knot_initial.clone()));
                 }
 
                 if point_response.dragged() {
                     let pos = point_response.interact_pointer_pos().unwrap();
                     let mut knot_pos = bars_to_screen.inverse().transform_pos(pos);
-                    println!("single_knot_drag {:?}", knot_pos.x);
+                    trace!("single_knot_drag {:?}", knot_pos.x);
                     knot_pos.x = (knot_pos.x * (self.quantization as f32)).round()
                         / (self.quantization as f32);
-                    println!("rounded {:?}", knot_pos.x);
+                    trace!("rounded {:?}", knot_pos.x);
 
                     // never move last knot
                     // we could think about clamping to 0.0, 1.0 for binary fader
                     if i > 0 && i < fader_knots.len() - 1 {
                         if knot_pos.x >= k.pos.x {
                             // right
-                            println!("-- right");
+                            trace!("-- right");
                             if knot_pos.x <= fader_knots[i + 1].pos.x {
                                 k.pos.x = knot_pos.x;
                             }
                         } else if knot_pos.x < k.pos.x {
                             // left
+                            trace!("-- left");
                             if knot_pos.x >= fader_knots[i - 1].pos.x {
                                 k.pos.x = knot_pos.x;
                             }
@@ -999,7 +1003,7 @@ impl Cut {
 
             checkpoint.push(CheckPointData::FaderKnots(self.fader_knots.clone()));
 
-            println!("new fader knot point");
+            debug!("new fader knot point");
             let (head, mut tail): (Vec<_>, Vec<_>) = fader_knots.partition(|k| pos.x < k.pos.x);
 
             tail.push(Knot {
@@ -1010,7 +1014,7 @@ impl Cut {
 
             self.fader_knots = tail;
 
-            println!("fader knots {:?}", self.fader_knots);
+            debug!("fader knots {:?}", self.fader_knots);
 
             fader_update = true;
         }
@@ -1216,32 +1220,32 @@ impl Cut {
 
         // store checkpoint
         if !checkpoint.is_empty() {
-            println!("store checkpoint");
+            debug!("store undo checkpoint");
             self.undo.push(checkpoint);
         }
 
         // undo checkpoint
         if ui.input_mut(|i| i.consume_key(Modifiers::CTRL, Key::Z)) {
-            println!("Ctrl-Z");
+            debug!("Undo Ctrl-Z");
             if let Some(check_point) = self.undo.pop() {
                 let mut redo = vec![];
                 check_point
                     .into_iter()
                     .for_each(|check_point_data| match check_point_data {
                         CheckPointData::CutKnots(cut_knots) => {
-                            println!("undo cut_knots {:?}", cut_knots);
+                            debug!("undo cut_knots {:?}", cut_knots);
                             redo.push(CheckPointData::CutKnots(self.cut_knots.clone()));
                             self.cut_knots = cut_knots;
                             self.cut_spline_update()
                         }
                         CheckPointData::FaderKnots(fader_knots) => {
-                            println!("undo fader_knots {:?}", fader_knots);
+                            debug!("undo fader_knots {:?}", fader_knots);
                             redo.push(CheckPointData::FaderKnots(self.fader_knots.clone()));
                             self.fader_knots = fader_knots;
                             self.fader_spline_update();
                         }
                         CheckPointData::CutKnot(IndexKnot { index, knot }) => {
-                            println!("undo cut_knot {:?}", index);
+                            debug!("undo cut_knot {:?}", index);
                             redo.push(CheckPointData::CutKnot(IndexKnot {
                                 index,
                                 knot: self.cut_knots[index],
@@ -1250,7 +1254,7 @@ impl Cut {
                             self.cut_spline_update();
                         }
                         CheckPointData::FaderKnot(IndexKnot { index, knot }) => {
-                            println!("undo fader knot {:?}", index);
+                            debug!("undo fader knot {:?}", index);
                             redo.push(CheckPointData::FaderKnot(IndexKnot {
                                 index,
                                 knot: self.fader_knots[index],
@@ -1260,7 +1264,7 @@ impl Cut {
                         }
                     });
                 if !redo.is_empty() {
-                    println!("store redo checkpoint");
+                    debug!("store redo checkpoint");
                     self.redo.push(redo);
                 }
             }
@@ -1268,7 +1272,7 @@ impl Cut {
 
         // redo checkpoint
         if ui.input_mut(|i| i.consume_key(Modifiers::CTRL | Modifiers::SHIFT, Key::Z)) {
-            println!("Shift Ctrl-Z");
+            debug!("Shift Ctrl-Z");
             // restore checkpoint
             if let Some(check_point) = self.redo.pop() {
                 let mut undo = vec![];
@@ -1276,19 +1280,19 @@ impl Cut {
                     .into_iter()
                     .for_each(|check_point_data| match check_point_data {
                         CheckPointData::CutKnots(cut_knots) => {
-                            println!("redo cut_knots {:?}", cut_knots);
+                            debug!("redo cut_knots {:?}", cut_knots);
                             undo.push(CheckPointData::CutKnots(self.cut_knots.clone()));
                             self.cut_knots = cut_knots;
                             self.cut_spline_update()
                         }
                         CheckPointData::FaderKnots(fader_knots) => {
-                            println!("redo fader_knots {:?}", fader_knots);
+                            debug!("redo fader_knots {:?}", fader_knots);
                             undo.push(CheckPointData::FaderKnots(self.fader_knots.clone()));
                             self.fader_knots = fader_knots;
                             self.fader_spline_update();
                         }
                         CheckPointData::CutKnot(IndexKnot { index, knot }) => {
-                            println!("redo cut knot {:?}", index);
+                            debug!("redo cut knot {:?}", index);
                             undo.push(CheckPointData::CutKnot(IndexKnot {
                                 index,
                                 knot: self.cut_knots[index],
@@ -1297,7 +1301,7 @@ impl Cut {
                             self.cut_spline_update();
                         }
                         CheckPointData::FaderKnot(IndexKnot { index, knot }) => {
-                            println!("redo fader knot {:?}", index);
+                            debug!("redo fader knot {:?}", index);
                             undo.push(CheckPointData::FaderKnot(IndexKnot {
                                 index,
                                 knot: self.fader_knots[index],
@@ -1307,7 +1311,7 @@ impl Cut {
                         }
                     });
                 if !undo.is_empty() {
-                    println!("store redo checkpoint");
+                    debug!("store redo checkpoint");
                     self.undo.push(undo);
                 }
             }

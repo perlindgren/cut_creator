@@ -1,4 +1,4 @@
-#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
+// #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
 
 use std::fs::File;
 use std::io::prelude::*;
@@ -9,10 +9,11 @@ use cut_creator::{
 };
 
 use egui::*;
-use log::trace;
+use log::{debug, info};
 
 fn main() -> Result<(), eframe::Error> {
     env_logger::init(); // Log to stderr (if you run with `RUST_LOG=debug`).
+    info!("env_logger started");
 
     let options = eframe::NativeOptions {
         // initial_window_size: Some(egui::vec2(1000.0, 500.0)),
@@ -28,7 +29,7 @@ fn main() -> Result<(), eframe::Error> {
     if let Ok(mut file) = File::open("config.json") {
         let mut json = String::new();
         file.read_to_string(&mut json).unwrap();
-        trace!("config json {}", json);
+        debug!("config json {}", json);
         app.config = serde_json::from_str(&json).unwrap();
     }
 
@@ -69,12 +70,13 @@ impl App {
 
     /// load file
     fn load_file(&mut self, i: usize) {
+        debug!("load_file cut #{}", i);
         self.status = match Cut::load_file() {
-            Ok(cut) => {
+            Ok((cut, msg)) => {
                 let path = cut.cut_path.clone();
                 self.cuts[self.cur_cut] = OptCut(Some(cut));
                 self.enabled[i] = true;
-                format!("File loaded {}", path.to_string_lossy())
+                format!("File loaded {}, ({})", path.to_string_lossy(), msg)
             }
             Err(err) => err,
         };
@@ -82,6 +84,7 @@ impl App {
 
     /// clear all cuts but i
     fn clear_cuts(&mut self, i: usize) {
+        debug!("clear_cuts all but {}", i);
         for (index, enable) in self.enabled.iter_mut().enumerate() {
             if index != i {
                 *enable = false
@@ -93,10 +96,10 @@ impl App {
 impl eframe::App for App {
     /// on exit
     fn on_exit(&mut self, _gl: Option<&eframe::glow::Context>) {
-        trace!("exit");
+        debug!("exit");
         // Serialize it to a JSON string.
         let json = serde_json::to_string(&self.config).unwrap();
-        trace!("json config {}", json);
+        debug!("json config {}", json);
 
         let mut file = File::create("config.json").unwrap();
         file.write_all(json.as_bytes()).unwrap();
@@ -307,12 +310,14 @@ impl eframe::App for App {
                     let height = ui.available_height();
                     let _width = ui.available_width();
                     let cut_height = (height - 20.0 - nr_enabled as f32 * 10.0) / nr_enabled as f32;
-                    trace!(
-                        "nr enabled {} height {}, cut_height {}",
-                        nr_enabled,
-                        height,
-                        cut_height
-                    );
+
+                    // Very busy tracing, so not enabled
+                    // trace!(
+                    //     "nr enabled {} height {}, cut_height {}",
+                    //     nr_enabled,
+                    //     height,
+                    //     cut_height
+                    // );
 
                     // right side panel with wav
                     egui::SidePanel::right("right")

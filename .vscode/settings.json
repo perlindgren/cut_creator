@@ -6,6 +6,7 @@
     "Catmull",
     "Resampler",
     "Sinc",
+    "clippy",
     "consts",
     "eframe",
     "egui",
