@@ -4,14 +4,14 @@ use egui::*;
 use serde::{Deserialize, Serialize};
 
 use std::{fs::File, path::PathBuf};
-use wav::{BitDepth, Header};
-
+// use wav::{BitDepth, Header};
+use hound::WavSpec;
 use log::trace;
 
-#[derive(Default, Debug)]
+#[derive(Debug)]
 pub struct WavData {
-    header: Header,
-    _stereo: Vec<f32>,
+    wav_spec: WavSpec,
+    // _stereo: Vec<f32>,
     left: Vec<f32>,
     right: Vec<f32>,
     /// the max length
@@ -23,21 +23,24 @@ pub struct WavData {
 impl WavData {
     /// load
     pub fn load_wav_data(path: PathBuf) -> Result<Self, String> {
-        let mut inp_file = File::open(&path).map_err(|err| err.to_string())?;
-        let (header, data) = wav::read(&mut inp_file).unwrap();
-        trace!("header {:?}", header);
+        // let mut inp_file = File::open(&path).map_err(|err| err.to_string())?;
+        // let (header, data) = wav::read(&mut inp_file).unwrap();
+        // trace!("header {:?}", header);
 
-        let _stereo = match data {
-            BitDepth::ThirtyTwoFloat(v) => {
-                trace!("len total{}", v.len());
-                v
-            }
-            _ => {
-                vec![]
-            }
-        };
+        // let _stereo = match data {
+        //     BitDepth::ThirtyTwoFloat(v) => {
+        //         trace!("len total{}", v.len());
+        //         v
+        //     }
+        //     _ => {
+        //         vec![]
+        //     }
+        // };
 
-        let mut v = _stereo.iter();
+        let filename = path.file_stem().unwrap().to_str().unwrap().to_owned();
+        let mut reader = hound::WavReader::open(path).unwrap();
+        let wav_spec = reader.spec();
+        let mut v = reader.samples();
         let mut left = vec![];
         let mut right = vec![];
         while let Some(l) = v.next() {
@@ -46,11 +49,10 @@ impl WavData {
         }
         let len = left.len();
         trace!("len samples{}", len);
-        let filename = path.file_stem().unwrap().to_str().unwrap().to_owned();
 
         Ok(WavData {
-            header,
-            _stereo,
+            wav_spec,
+            // _stereo,
             left,
             right,
             len,
@@ -58,8 +60,8 @@ impl WavData {
         })
     }
 
-    pub fn get_header(&self) -> Header {
-        self.header
+    pub fn get_wav_spec(&self) -> WavSpec {
+        self.wav_spec
     }
 
     pub fn get_sample(&self, index: usize) -> (f32, f32) {
@@ -89,7 +91,7 @@ impl Wav {
     pub fn get_sample(&self, p: usize, wav_data: &WavData) -> (f32, f32) {
         let t = p + self.data.offset;
         // if t < self.data.len {
-            wav_data.get_sample(t)
+        wav_data.get_sample(t)
         // } else {
         //     (0.0, 0.0)
         // }

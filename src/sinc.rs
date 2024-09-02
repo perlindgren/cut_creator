@@ -2,6 +2,7 @@
 use crate::cut_panel::Cut;
 // use crate::wav_panel::Wav;
 // use wav::Header;
+use hound::WavSpec;
 
 use std::f32::consts::PI;
 
@@ -39,7 +40,7 @@ pub fn sinc_resample(cut: &Cut) {
     let nr_sinc_samples = 10;
     let first_sinc_sample = nr_sinc_samples / 2;
 
-    let offset = cut.wav.get_data_offset();
+    let _offset = cut.wav.get_data_offset();
 
     let mut out = vec![];
     for i in 0..out_samples as usize {

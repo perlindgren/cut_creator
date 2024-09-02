@@ -1,7 +1,7 @@
 use std::f32::consts::PI;
 
 // normalized sinc, 0 at 1
-fn sinc(x: f32) -> f32 {
+fn _sinc(x: f32) -> f32 {
     if x != 0.0 {
         (x * PI).sin() / (x * PI)
     } else {
