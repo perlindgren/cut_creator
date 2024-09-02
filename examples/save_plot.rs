@@ -23,7 +23,7 @@ struct MyApp {
 }
 
 impl eframe::App for MyApp {
-    fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
+    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         let mut plot_rect = None;
         egui::CentralPanel::default().show(ctx, |ui| {
             // these are just some dummy variables for the example,
@@ -67,7 +67,7 @@ impl eframe::App for MyApp {
             ui.add_space(border_y);
         });
 
-        if let (Some(screenshot), Some(plot_location)) = (self.screenshot.take(), plot_rect) {
+        if let (Some(_screenshot), Some(_plot_location)) = (self.screenshot.take(), plot_rect) {
             println!("--");
             if let Some(mut path) = rfd::FileDialog::new().save_file() {
                 path.set_extension("png");

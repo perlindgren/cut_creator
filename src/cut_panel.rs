@@ -452,7 +452,8 @@ impl Cut {
         }
     }
 
-    ///
+    /// Save Cut Dialogue
+    /// TODO: Does sometimes not pop-up under existing windows
     fn save_cut_dialogue(&mut self) -> String {
         let directory = self.cut_path.parent().unwrap();
         trace!("directory : {:?}", directory);
@@ -773,9 +774,8 @@ impl Cut {
             // cut knots up/down
             for i in 1..cut_knots.len() - 1 {
                 if self.cut_knots[i].selected {
-                    self.cut_knots[i].pos.y = (self.move_cut_initial[i].pos.y + bar_rel.y)
-                        .min(1.0)
-                        .max(0.0);
+                    self.cut_knots[i].pos.y =
+                        (self.move_cut_initial[i].pos.y + bar_rel.y).clamp(0.0, 1.0);
                 }
             }
         }
@@ -842,7 +842,7 @@ impl Cut {
                         }
                     }
 
-                    k.pos.y = knot_pos.y.min(1.0).max(0.0); // clamp to range
+                    k.pos.y = knot_pos.y.clamp(0.0, 1.0); // clamp to range
 
                     cut_update = true;
                 }
@@ -921,7 +921,7 @@ impl Cut {
                         }
                     }
 
-                    k.pos.y = knot_pos.y.min(1.0).max(0.0); // clamp to range
+                    k.pos.y = knot_pos.y.clamp(0.0, 1.0); // clamp to range
 
                     fader_update = true;
                 }
@@ -1052,7 +1052,7 @@ impl Cut {
                         y
                     }
                 } else {
-                    y.max(0.0).min(1.0)
+                    y.clamp(0.0, 1.0)
                 };
 
                 let fader_y = self.fader_spline.sample(t).unwrap();
@@ -1155,7 +1155,7 @@ impl Cut {
                         y
                     }
                 } else {
-                    y.max(0.0).min(1.0)
+                    y.clamp(0.0, 1.0)
                 };
                 self.value = Some(y);
             } else {

@@ -35,21 +35,22 @@ fn main() -> Result<(), eframe::Error> {
     eframe::run_native("Cut Creator", options, Box::new(|_cc| app))
 }
 
+const NR_EDITORS: usize = 10;
 #[derive(Default)]
 struct App {
-    ///
-    enabled: [bool; 10],
-    /// we have 10 save slots
-    cuts: [OptCut; 10],
-    /// index of selected cut
+    /// Enable/disable each cut slots
+    enabled: [bool; NR_EDITORS],
+    /// We have NR_EDITORS save slots
+    cuts: [OptCut; NR_EDITORS],
+    /// Index of selected cut
     cur_cut: usize,
-    /// config
+    /// Top level configuration
     config: Config,
-    ///
+    /// Allowed to close (depending on save state)
     allowed_to_close: bool,
-    ///
+    /// Set if confirmation dialogue already open
     show_confirmation_dialog: bool,
-    /// status bottom
+    /// Status string at bottom
     status: String,
 }
 
@@ -90,7 +91,7 @@ impl eframe::App for App {
     }
 
     /// update
-    fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
+    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         // close?
         if ctx.input(|i| i.viewport().close_requested())
             && !self.allowed_to_close // not allowed to close
