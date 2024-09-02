@@ -15,6 +15,19 @@ The mold linker for improved build times under linux.
   
 - Export sample: Click Sample button.
 
+## Development
+
+This crate uses the `env_logger` crate for logging.
+
+### Windows
+
+In Powershell:
+
+``` shell
+$env:RUST_LOG="cut_creator=trace"
+cargo run --release
+```
+
 ## License
 
 To be determined: Open source and (at least free for non-commercial use)

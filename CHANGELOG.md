@@ -4,3 +4,4 @@
 
 - Fixed clippy warnings
 - Updated dependencies (now egui 0.28, etc.)
+- Better logging
