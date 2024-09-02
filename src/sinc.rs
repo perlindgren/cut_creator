@@ -2,7 +2,7 @@
 use crate::cut_panel::Cut;
 // use crate::wav_panel::Wav;
 // use wav::Header;
-use hound::WavSpec;
+// use hound::WavSpec;
 
 use std::f32::consts::PI;
 
@@ -17,10 +17,10 @@ fn sinc(x: f32) -> f32 {
 
 pub fn sinc_resample(cut: &Cut) {
     let bpm = 120.0; // in 4/4
-    let header = cut.wav_data.get_header();
-    println!("header {:?}", header);
+    let wav_spec = cut.wav_data.get_wav_spec().unwrap();
+    println!("wav_spec {:?}", wav_spec);
 
-    let _in_rate = header.sampling_rate as f32;
+    let _in_rate = wav_spec.sample_rate as f32;
     let out_rate = 48000.0;
 
     let bars = cut.get_bars();

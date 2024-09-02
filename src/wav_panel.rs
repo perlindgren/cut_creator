@@ -3,14 +3,14 @@ use egui::epaint::PathShape;
 use egui::*;
 use serde::{Deserialize, Serialize};
 
-use std::{fs::File, path::PathBuf};
+use std::path::PathBuf;
 // use wav::{BitDepth, Header};
 use hound::WavSpec;
 use log::trace;
 
-#[derive(Debug)]
+#[derive(Default, Debug)]
 pub struct WavData {
-    wav_spec: WavSpec,
+    wav_spec: Option<WavSpec>,
     // _stereo: Vec<f32>,
     left: Vec<f32>,
     right: Vec<f32>,
@@ -23,35 +23,33 @@ pub struct WavData {
 impl WavData {
     /// load
     pub fn load_wav_data(path: PathBuf) -> Result<Self, String> {
-        // let mut inp_file = File::open(&path).map_err(|err| err.to_string())?;
-        // let (header, data) = wav::read(&mut inp_file).unwrap();
-        // trace!("header {:?}", header);
-
-        // let _stereo = match data {
-        //     BitDepth::ThirtyTwoFloat(v) => {
-        //         trace!("len total{}", v.len());
-        //         v
-        //     }
-        //     _ => {
-        //         vec![]
-        //     }
-        // };
-
         let filename = path.file_stem().unwrap().to_str().unwrap().to_owned();
-        let mut reader = hound::WavReader::open(path).unwrap();
+        let mut reader = hound::WavReader::open(path)
+            .map_err(|_| "Unsupported format (use stereo WAV)".to_string())?;
         let wav_spec = reader.spec();
-        let mut v = reader.samples();
-        let mut left = vec![];
-        let mut right = vec![];
-        while let Some(l) = v.next() {
-            left.push(*l);
-            right.push(*v.next().unwrap())
+        trace!("wav_spec {:?}", wav_spec);
+        if wav_spec.channels != 2 {
+            Err("Only stereo files supported")?;
         }
-        let len = left.len();
+
+        let (left, right, _b) =
+            reader
+                .samples::<f32>()
+                .fold((vec![], vec![], false), |(mut l, mut r, b), s| {
+                    let s = s.unwrap();
+                    if b {
+                        l.push(s);
+                    } else {
+                        r.push(s);
+                    }
+                    (l, r, !b)
+                });
+
+        let len = reader.duration() as usize;
         trace!("len samples{}", len);
 
         Ok(WavData {
-            wav_spec,
+            wav_spec: Some(wav_spec),
             // _stereo,
             left,
             right,
@@ -60,7 +58,7 @@ impl WavData {
         })
     }
 
-    pub fn get_wav_spec(&self) -> WavSpec {
+    pub fn get_wav_spec(&self) -> Option<WavSpec> {
         self.wav_spec
     }
 

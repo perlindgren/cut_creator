@@ -12,7 +12,11 @@ fn main() -> Result<(), eframe::Error> {
         viewport: egui::ViewportBuilder::default().with_inner_size([600.0, 400.0]),
         ..Default::default()
     };
-    eframe::run_native("Wav Plot", options, Box::new(|_cc| Box::<MyApp>::default()))
+    eframe::run_native(
+        "Wav Plot",
+        options,
+        Box::new(|cc| Ok(Box::new(MyApp::new(cc)))),
+    )
 }
 
 use splines::{Interpolation, Key, Spline};
@@ -32,6 +36,16 @@ impl Default for MyApp {
         );
 
         Self { knots, splines }
+    }
+}
+
+impl MyApp {
+    fn new(_cc: &eframe::CreationContext<'_>) -> Self {
+        // Customize egui here with cc.egui_ctx.set_fonts and cc.egui_ctx.set_visuals.
+        // Restore app state using cc.storage (requires the "persistence" feature).
+        // Use the cc.gl (a glow::Context) to create graphics shaders and buffers that you can use
+        // for e.g. egui::PaintCallback.
+        Self::default()
     }
 }
 
