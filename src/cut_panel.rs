@@ -608,7 +608,7 @@ impl Cut {
             self.select_drag = true;
         }
 
-        if response.drag_released_by(PointerButton::Secondary) {
+        if response.drag_stopped_by(PointerButton::Secondary) {
             let pos = response.interact_pointer_pos().unwrap();
             trace!("select end {:?} ", pos);
             let rect = Rect::from_two_pos(self.select_start, self.select_end);
@@ -670,7 +670,7 @@ impl Cut {
             trace!("start move {:?}", self.move_start);
         }
 
-        if response.drag_released_by(PointerButton::Primary) {
+        if response.drag_stopped_by(PointerButton::Primary) {
             self.move_drag = true;
             trace!("end move");
             if self.cut_knots != self.move_cut_initial {
@@ -814,7 +814,7 @@ impl Cut {
                     };
                 }
 
-                if point_response.drag_released() {
+                if point_response.drag_stopped() {
                     println!("released - undo cut_knots");
                     checkpoint.push(CheckPointData::CutKnot(self.move_knot_initial.clone()));
                 }
@@ -891,7 +891,7 @@ impl Cut {
                     self.move_knot_initial = IndexKnot { index: i, knot: *k };
                 }
 
-                if point_response.drag_released() {
+                if point_response.drag_stopped() {
                     println!("released - undo fader_knots");
                     checkpoint.push(CheckPointData::FaderKnot(self.move_knot_initial.clone()));
                 }

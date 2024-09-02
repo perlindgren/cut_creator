@@ -32,7 +32,11 @@ fn main() -> Result<(), eframe::Error> {
         app.config = serde_json::from_str(&json).unwrap();
     }
 
-    eframe::run_native("Cut Creator", options, Box::new(|_cc| app))
+    eframe::run_native(
+        "Cut Creator",
+        options,
+        Box::new(|_cc| Ok(Box::new(App::new(_cc)))),
+    )
 }
 
 const NR_EDITORS: usize = 10;
@@ -55,6 +59,14 @@ struct App {
 }
 
 impl App {
+    fn new(_cc: &eframe::CreationContext<'_>) -> Self {
+        // Customize egui here with cc.egui_ctx.set_fonts and cc.egui_ctx.set_visuals.
+        // Restore app state using cc.storage (requires the "persistence" feature).
+        // Use the cc.gl (a glow::Context) to create graphics shaders and buffers that you can use
+        // for e.g. egui::PaintCallback.
+        Self::default()
+    }
+
     /// load file
     fn load_file(&mut self, i: usize) {
         self.status = match Cut::load_file() {
